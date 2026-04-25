@@ -31,12 +31,12 @@ async function searchLegalDocs(query) {
 
 // Create or update a user profile (called after Firebase login)
 app.post('/api/users', async (req, res) => {
-  const { uid, email, role } = req.body;
+  const { uid, email, role, auth_provider } = req.body;
   if (!uid || !email) return res.status(400).json({ error: 'uid and email required' });
 
   const { data, error } = await supabase
     .from('profiles')
-    .upsert({ id: uid, email, role: role || 'citizen' }, { onConflict: 'id' })
+    .upsert({ id: uid, email, role: role || 'citizen', auth_provider: auth_provider || 'password' }, { onConflict: 'id' })
     .select()
     .single();
 
@@ -99,7 +99,7 @@ app.get('/api/admin/stats', async (req, res) => {
 app.get('/api/admin/users', async (req, res) => {
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, email, role, auth_provider, created_at')
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -134,6 +134,17 @@ app.delete('/api/admin/documents/:id', async (req, res) => {
     .eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
+});
+
+// GET /api/admin/messages
+app.get('/api/admin/messages', async (req, res) => {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, content, sender, created_at, user_id, profiles(email, role, auth_provider), session_id, chat_sessions(title)')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
 });
 
 // DELETE /api/admin/users/:uid

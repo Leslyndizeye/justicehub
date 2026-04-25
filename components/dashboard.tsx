@@ -37,10 +37,11 @@ const Dashboard: React.FC = () => {
     const init = async () => {
       try {
         // Upsert user profile in Supabase
+        const provider = user.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'password';
         const profileRes = await fetch(`${API}/api/users`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uid: user.uid, email: user.email, role: 'citizen' }),
+          body: JSON.stringify({ uid: user.uid, email: user.email, role: 'citizen', auth_provider: provider }),
         });
         const profile = await profileRes.json();
         if (profile.role) setUserRole(profile.role);
