@@ -19,26 +19,21 @@ import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-export const ThemeContext = React.createContext({
-  isDark: true,
-  toggleTheme: () => {},
-});
+export const ThemeContext = React.createContext({ isDark: true, toggleTheme: () => {} });
 
-// ── Landing page ───────────────────────────────────────────────
+// ── Landing page ──────────────────────────────────────────────
 const LandingPage: React.FC<{ onAuthClick: () => void }> = ({ onAuthClick }) => (
   <>
     <Navbar onAuthClick={onAuthClick} />
     <main>
       <Hero />
       <SocialProof />
-
       <div className="py-20 bg-neutral-100 dark:bg-[#05070A]">
         <div className="max-w-6xl mx-auto px-6 text-center">
           <h3 className="text-2xl font-serif italic text-legal-gold mb-4">The Sovereign Standard</h3>
           <p className="text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto text-sm">Elevating the Rwandan Jurisprudential landscape through high-fidelity cognitive analysis and sovereign data protocols.</p>
         </div>
       </div>
-
       <Services />
       <Features />
       <Process />
@@ -47,7 +42,6 @@ const LandingPage: React.FC<{ onAuthClick: () => void }> = ({ onAuthClick }) => 
       <FAQ />
       <CTA />
     </main>
-
     <footer className="py-16 px-6 bg-neutral-100 dark:bg-[#05070A]">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center text-neutral-500 dark:text-neutral-500 text-sm">
         <div className="flex flex-col items-center md:items-start gap-4">
@@ -67,82 +61,44 @@ const LandingPage: React.FC<{ onAuthClick: () => void }> = ({ onAuthClick }) => 
   </>
 );
 
-// ── Fetch user role from Supabase ──────────────────────────────
-async function getUserRole(uid: string): Promise<string> {
-  try {
-    const res = await fetch(`${API}/api/users/${uid}`);
-    const data = await res.json();
-    return data.role ?? 'citizen';
-  } catch {
-    return 'citizen';
-  }
-}
+// ── Spinner ───────────────────────────────────────────────────
+const Spinner = () => (
+  <div className="min-h-screen bg-[#05070A] flex items-center justify-center">
+    <div className="w-8 h-8 border-2 border-legal-gold/20 border-t-legal-gold rounded-full animate-spin"></div>
+  </div>
+);
 
-// ── Protected route (non-admin users) ─────────────────────────
-const ProtectedRoute: React.FC<{ user: User | null; children: React.ReactNode }> = ({ user, children }) => {
-  if (!user) return <Navigate to="/auth" replace />;
-  return <>{children}</>;
-};
-
-// ── Admin route — only role=admin can enter /adminxt ──────────
-const AdminRoute: React.FC<{ user: User | null; children: React.ReactNode }> = ({ user, children }) => {
-  const [role, setRole] = React.useState<string | null>(null);
-  const [checking, setChecking] = React.useState(true);
-
-  React.useEffect(() => {
-    if (!user) { setChecking(false); return; }
-    getUserRole(user.uid).then(r => setRole(r)).finally(() => setChecking(false));
-  }, [user]);
-
-  if (!user) return <Navigate to="/auth" replace />;
-  if (checking) return (
-    <div className="min-h-screen bg-[#05070A] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-legal-gold/20 border-t-legal-gold rounded-full animate-spin"></div>
-    </div>
-  );
-  if (role !== 'admin') return <Navigate to="/dashboard" replace />;
-  return <>{children}</>;
-};
-
-// ── Smart redirect after login ─────────────────────────────────
-// Upserts profile (creates if new, preserves role if existing) then redirects
-const PostLoginRedirect: React.FC<{ user: User }> = ({ user }) => {
-  const navigate = useNavigate();
-
-  React.useEffect(() => {
-    const provider = user.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'password';
-    fetch(`${API}/api/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid: user.uid, email: user.email, auth_provider: provider }),
-    })
-      .then(r => r.json())
-      .then(profile => {
-        navigate(profile.role === 'admin' ? '/adminxt' : '/dashboard', { replace: true });
-      })
-      .catch(() => navigate('/dashboard', { replace: true }));
-  }, [user.uid]);
-
-  return (
-    <div className="min-h-screen bg-[#05070A] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-legal-gold/20 border-t-legal-gold rounded-full animate-spin"></div>
-    </div>
-  );
-};
-
-// ── App ────────────────────────────────────────────────────────
+// ── App ───────────────────────────────────────────────────────
 const App: React.FC = () => {
   const [isIntroFinished, setIsIntroFinished] = useState(false);
   const [isDark, setIsDark] = useState(true);
-  const [user, setUser] = useState<User | null | 'loading'>('loading');
-  const backgroundTimerRef = useRef<number | null>(null);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [user, setUser]     = useState<User | null | 'loading'>('loading');
+  const [role, setRole]     = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(false);
+  const backgroundTimerRef  = useRef<number | null>(null);
+  const navigate  = useNavigate();
+  const location  = useLocation();
 
   const toggleTheme = () => {
     setIsDark(d => !d);
     document.documentElement.classList.toggle('dark');
     document.documentElement.classList.toggle('light');
+  };
+
+  // Upsert profile → returns role without ever overwriting it
+  const resolveRole = async (u: User): Promise<string> => {
+    try {
+      const provider = u.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'password';
+      const res = await fetch(`${API}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: u.uid, email: u.email, auth_provider: provider }),
+      });
+      const data = await res.json();
+      return data.role ?? 'citizen';
+    } catch {
+      return 'citizen';
+    }
   };
 
   useEffect(() => {
@@ -153,8 +109,21 @@ const App: React.FC = () => {
       navigate('/auth', { state: { mode: 'confirmReset', oobCode: params.get('oobCode') }, replace: true });
     }
 
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      if (u) {
+        setRoleLoading(true);
+        const r = await resolveRole(u);
+        setRole(r);
+        setRoleLoading(false);
+        // Redirect from /auth after login
+        if (location.pathname === '/auth') {
+          navigate(r === 'admin' ? '/adminxt' : '/dashboard', { replace: true });
+        }
+      } else {
+        setRole(null);
+        setRoleLoading(false);
+      }
     });
 
     const handleVisibility = () => {
@@ -176,7 +145,8 @@ const App: React.FC = () => {
   }, []);
 
   const showIntro = !isIntroFinished && location.pathname === '/';
-  const isReady = user !== 'loading';
+  // Wait for both Firebase auth AND role fetch to complete before rendering routes
+  const isReady = user !== 'loading' && !roleLoading;
 
   return (
     <ThemeContext.Provider value={{ isDark, toggleTheme }}>
@@ -188,10 +158,10 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<LandingPage onAuthClick={() => navigate('/auth')} />} />
 
-              {/* Auth page — if already logged in, check role then redirect */}
+              {/* Auth page */}
               <Route path="/auth" element={
                 user
-                  ? <PostLoginRedirect user={user as User} />
+                  ? <Navigate to={role === 'admin' ? '/adminxt' : '/dashboard'} replace />
                   : <AuthPage
                       onBack={() => navigate('/')}
                       initialMode={(location.state as any)?.mode}
@@ -199,16 +169,22 @@ const App: React.FC = () => {
                     />
               } />
 
+              {/* Regular dashboard — redirect to adminxt if admin */}
               <Route path="/dashboard" element={
-                <ProtectedRoute user={user as User | null}>
-                  <Dashboard />
-                </ProtectedRoute>
+                !user
+                  ? <Navigate to="/auth" replace />
+                  : role === 'admin'
+                  ? <Navigate to="/adminxt" replace />
+                  : <Dashboard />
               } />
 
+              {/* Admin panel — redirect to dashboard if not admin */}
               <Route path="/adminxt" element={
-                <AdminRoute user={user as User | null}>
-                  <AdminDashboard />
-                </AdminRoute>
+                !user
+                  ? <Navigate to="/auth" replace />
+                  : role !== 'admin'
+                  ? <Navigate to="/dashboard" replace />
+                  : <AdminDashboard />
               } />
 
               <Route path="/solutions"    element={<Navigate to="/#services"     replace />} />
