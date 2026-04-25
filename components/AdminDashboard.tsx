@@ -224,7 +224,7 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-center gap-4">
             <span className="text-[10px] text-neutral-500 font-bold hidden md:block">{user?.email}</span>
             <button onClick={() => navigate('/dashboard')} className="px-4 py-2 rounded-lg border border-white/10 text-[9px] font-black uppercase tracking-widest hover:bg-white/5 transition-all">
-              My Dashboard
+              User Dashboard
             </button>
             <button onClick={() => signOut(auth).then(() => navigate('/auth'))} className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">
               Sign Out

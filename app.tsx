@@ -17,6 +17,8 @@ import AdminDashboard from './components/AdminDashboard';
 import { auth } from './components/firebaseConfig';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
 export const ThemeContext = React.createContext({
   isDark: true,
   toggleTheme: () => {},
@@ -65,25 +67,31 @@ const LandingPage: React.FC<{ onAuthClick: () => void }> = ({ onAuthClick }) => 
   </>
 );
 
-// ── Protected route ────────────────────────────────────────────
+// ── Fetch user role from Supabase ──────────────────────────────
+async function getUserRole(uid: string): Promise<string> {
+  try {
+    const res = await fetch(`${API}/api/users/${uid}`);
+    const data = await res.json();
+    return data.role ?? 'citizen';
+  } catch {
+    return 'citizen';
+  }
+}
+
+// ── Protected route (non-admin users) ─────────────────────────
 const ProtectedRoute: React.FC<{ user: User | null; children: React.ReactNode }> = ({ user, children }) => {
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
 };
 
-// ── Admin route ────────────────────────────────────────────────
+// ── Admin route — only role=admin can enter /adminxt ──────────
 const AdminRoute: React.FC<{ user: User | null; children: React.ReactNode }> = ({ user, children }) => {
   const [role, setRole] = React.useState<string | null>(null);
   const [checking, setChecking] = React.useState(true);
-  const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
   React.useEffect(() => {
     if (!user) { setChecking(false); return; }
-    fetch(`${API}/api/users/${user.uid}`)
-      .then(r => r.json())
-      .then(d => setRole(d.role ?? null))
-      .catch(() => setRole(null))
-      .finally(() => setChecking(false));
+    getUserRole(user.uid).then(r => setRole(r)).finally(() => setChecking(false));
   }, [user]);
 
   if (!user) return <Navigate to="/auth" replace />;
@@ -94,6 +102,27 @@ const AdminRoute: React.FC<{ user: User | null; children: React.ReactNode }> = (
   );
   if (role !== 'admin') return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
+};
+
+// ── Smart redirect after login ─────────────────────────────────
+// Checks role then sends admin → /adminxt, others → /dashboard
+const PostLoginRedirect: React.FC<{ user: User }> = ({ user }) => {
+  const navigate = useNavigate();
+  const [done, setDone] = React.useState(false);
+
+  React.useEffect(() => {
+    getUserRole(user.uid).then(role => {
+      navigate(role === 'admin' ? '/adminxt' : '/dashboard', { replace: true });
+      setDone(true);
+    });
+  }, [user.uid]);
+
+  if (done) return null;
+  return (
+    <div className="min-h-screen bg-[#05070A] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-legal-gold/20 border-t-legal-gold rounded-full animate-spin"></div>
+    </div>
+  );
 };
 
 // ── App ────────────────────────────────────────────────────────
@@ -114,7 +143,6 @@ const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.className = 'dark scroll-smooth overflow-x-hidden';
 
-    // Handle Firebase password-reset links (?mode=resetPassword&oobCode=...)
     const params = new URLSearchParams(location.search);
     if (params.get('mode') === 'resetPassword' && params.get('oobCode')) {
       navigate('/auth', { state: { mode: 'confirmReset', oobCode: params.get('oobCode') }, replace: true });
@@ -122,14 +150,13 @@ const App: React.FC = () => {
 
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (u && location.pathname === '/auth') navigate('/dashboard', { replace: true });
     });
 
     const handleVisibility = () => {
       if (document.hidden && auth.currentUser) {
         backgroundTimerRef.current = window.setTimeout(() => {
           signOut(auth).then(() => navigate('/auth', { replace: true }));
-        }, 3 * 60 * 60 * 1000); // 3 hours of inactivity
+        }, 3 * 60 * 60 * 1000);
       } else {
         if (backgroundTimerRef.current) { clearTimeout(backgroundTimerRef.current); backgroundTimerRef.current = null; }
       }
@@ -155,31 +182,36 @@ const App: React.FC = () => {
           {isReady && (
             <Routes>
               <Route path="/" element={<LandingPage onAuthClick={() => navigate('/auth')} />} />
+
+              {/* Auth page — if already logged in, check role then redirect */}
               <Route path="/auth" element={
-                user ? <Navigate to="/dashboard" replace /> :
-                <AuthPage
-                  onBack={() => navigate('/')}
-                  initialMode={(location.state as any)?.mode}
-                  oobCode={(location.state as any)?.oobCode}
-                />
+                user
+                  ? <PostLoginRedirect user={user as User} />
+                  : <AuthPage
+                      onBack={() => navigate('/')}
+                      initialMode={(location.state as any)?.mode}
+                      oobCode={(location.state as any)?.oobCode}
+                    />
               } />
+
               <Route path="/dashboard" element={
                 <ProtectedRoute user={user as User | null}>
                   <Dashboard />
                 </ProtectedRoute>
               } />
-              <Route path="/admin" element={
+
+              <Route path="/adminxt" element={
                 <AdminRoute user={user as User | null}>
                   <AdminDashboard />
                 </AdminRoute>
               } />
-              {/* Section deep-links → go to home with hash */}
-              <Route path="/solutions"    element={<Navigate to="/#services"      replace />} />
-              <Route path="/intelligence" element={<Navigate to="/#features"      replace />} />
-              <Route path="/method"       element={<Navigate to="/#process"       replace />} />
-              <Route path="/pricing"      element={<Navigate to="/#pricing"       replace />} />
-              <Route path="/testimonials" element={<Navigate to="/#testimonials"  replace />} />
-              <Route path="*"             element={<Navigate to="/"               replace />} />
+
+              <Route path="/solutions"    element={<Navigate to="/#services"     replace />} />
+              <Route path="/intelligence" element={<Navigate to="/#features"     replace />} />
+              <Route path="/method"       element={<Navigate to="/#process"      replace />} />
+              <Route path="/pricing"      element={<Navigate to="/#pricing"      replace />} />
+              <Route path="/testimonials" element={<Navigate to="/#testimonials" replace />} />
+              <Route path="*"             element={<Navigate to="/"              replace />} />
             </Routes>
           )}
         </div>
