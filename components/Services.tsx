@@ -89,7 +89,7 @@ const Services: React.FC = () => {
             <span className="text-[10px] font-black uppercase tracking-[0.5em] text-legal-gold">Legal Engineering & Strategy</span>
           </div>
           <h2 className="text-4xl md:text-7xl font-black tracking-tighter text-legal-navy dark:text-white uppercase leading-none max-w-4xl">
-            IREME JUSTICE DEPLOYS <br />
+            JUSTICEHUB DEPLOYS <br />
             <span className="font-serif italic text-legal-gold">Sovereign Jurisprudential Precision</span>
           </h2>
         </div>

@@ -30,7 +30,7 @@ const testimonials = [
     dark: false
   },
   {
-    quote: "Ireme ensures ubutabera is not just a concept, but an accessible reality.",
+    quote: "JusticeHub ensures ubutabera is not just a concept, but an accessible reality.",
     author: "Dr. Sandrine U.",
     role: "Constitutional Expert",
     emoji: "⁕",

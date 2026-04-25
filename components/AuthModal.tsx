@@ -220,7 +220,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
                 </>
               )}
 
-              <InputField label="Email Address" type="email" value={email} onChange={setEmail} placeholder="counsel@ireme.rw" />
+              <InputField label="Email Address" type="email" value={email} onChange={setEmail} placeholder="counsel@justicehub.rw" />
 
               {view !== 'forgot' && (
                 <div className="space-y-4">

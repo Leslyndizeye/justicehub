@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 const faqs = [
   {
-    q: "How does Ireme Justice AI ensure data sovereignty for Rwandan legal firms?",
+    q: "How does JusticeHub ensure data sovereignty for Rwandan legal firms?",
     a: "We operate on local sovereign clouds within Kigali, fully compliant with the Law No. 058/2021 relating to the protection of personal data and privacy, and the 2025 Digital Sovereignty Directives."
   },
   {
@@ -10,12 +10,12 @@ const faqs = [
     a: "Yes. Our models are trained specifically on the Journal Officiel (Official Gazette) and judicial records, capturing the high-level linguistic nuances of Rwandan legislative Kinyarwanda."
   },
   {
-    q: "Is Ireme an official partner of the Rwanda Law Reform Commission (RLRC)?",
-    a: "Ireme is a private legal-tech initiative engineered to support legal professionals. While we integrate with RLRC standards and gazette nodes, we are an independent technology provider for Advocates and Legal Officers."
+    q: "Is JusticeHub an official partner of the Rwanda Law Reform Commission (RLRC)?",
+    a: "JusticeHub is a private legal-tech initiative engineered to support legal professionals. While we integrate with RLRC standards and gazette nodes, we are an independent technology provider for Advocates and Legal Officers."
   },
   {
     q: "Can the AI generate documents for the IECMS?",
-    a: "Absolutely. Ireme includes a specialized formatting engine that prepares documents specifically for direct upload to the Integrated Electronic Case Management System (IECMS)."
+    a: "Absolutely. JusticeHub includes a specialized formatting engine that prepares documents specifically for direct upload to the Integrated Electronic Case Management System (IECMS)."
   }
 ];
 

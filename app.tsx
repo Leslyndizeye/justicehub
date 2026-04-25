@@ -50,15 +50,15 @@ const LandingPage: React.FC<{ onAuthClick: () => void }> = ({ onAuthClick }) => 
         <div className="flex flex-col items-center md:items-start gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-legal-gold flex items-center justify-center">
-              <span className="text-white font-black">I</span>
+              <span className="text-white font-black">J</span>
             </div>
-            <span className="text-lg font-bold text-legal-navy dark:text-white uppercase tracking-tighter">Ireme Justice AI</span>
+            <span className="text-lg font-bold text-legal-navy dark:text-white uppercase tracking-tighter">JusticeHub</span>
           </div>
           <p className="max-w-xs text-center md:text-left font-light">Elevating the Rwandan Jurisprudential landscape through sovereign intelligence.</p>
         </div>
       </div>
       <div className="max-w-6xl mx-auto mt-12 pt-8 border-t border-legal-gold/5 text-center text-[10px] opacity-50 uppercase tracking-[0.2em] font-bold">
-        © 2025 Ireme Justice AI Ltd. Registered in the Republic of Rwanda. RDB Certified.
+        © 2025 JusticeHub Ltd. Registered in the Republic of Rwanda. RDB Certified.
       </div>
     </footer>
   </>

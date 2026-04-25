@@ -4,7 +4,7 @@ const steps = [
   {
     num: "01",
     title: "Upload & Ingest",
-    desc: "Simply drop your case files, evidence, or legislation queries into the secure Ireme portal."
+    desc: "Simply drop your case files, evidence, or legislation queries into the secure JusticeHub portal."
   },
   {
     num: "02",

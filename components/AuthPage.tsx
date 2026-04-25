@@ -239,7 +239,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
             </svg>
           </div>
           <h1 className="text-3xl font-black tracking-tighter text-white uppercase mb-2">
-            {view === 'verify' ? 'Device Auth' : view === 'role' ? 'Select Domain' : view === 'forgot' ? 'Security Reset' : view === 'confirmReset' ? 'Credential Update' : 'ireme Access'}
+            {view === 'verify' ? 'Device Auth' : view === 'role' ? 'Select Domain' : view === 'forgot' ? 'Security Reset' : view === 'confirmReset' ? 'Credential Update' : 'JusticeHub Access'}
           </h1>
           <p className="text-legal-gold text-[10px] font-black tracking-[0.5em] uppercase opacity-80">Law & Wellbeing Intelligence</p>
         </div>
@@ -273,7 +273,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
                 <span className="text-white font-bold">{email}</span>. <br />
                 Please authorize your session.
               </p>
-              <button onClick={onBack} className="w-full py-5 bg-white text-black font-black uppercase tracking-[0.4em] text-[11px] rounded-2xl hover:bg-legal-gold hover:text-white transition-all shadow-xl">Return to ireme</button>
+              <button onClick={onBack} className="w-full py-5 bg-white text-black font-black uppercase tracking-[0.4em] text-[11px] rounded-2xl hover:bg-legal-gold hover:text-white transition-all shadow-xl">Return to JusticeHub</button>
             </div>
           )}
 
@@ -309,7 +309,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
                 </>
               )}
 
-              <InputField label="Email Identity" type="email" value={email} onChange={setEmail} placeholder="identity@ireme.rw" />
+              <InputField label="Email Identity" type="email" value={email} onChange={setEmail} placeholder="identity@justicehub.rw" />
 
               {view !== 'forgot' && (
                 <div className="space-y-6">
@@ -359,7 +359,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
                       onClick={() => { resetMessages(); if (view === 'login') setView('role'); else setView('login'); }}
                       className="text-[10px] text-neutral-500 font-bold uppercase tracking-[0.3em] hover:text-legal-gold transition-colors"
                     >
-                      {view === 'login' ? "Register ireme Identity" : "Already Identified? Login"}
+                      {view === 'login' ? "Register JusticeHub Identity" : "Already Identified? Login"}
                     </button>
                   </div>
                 </>
@@ -376,7 +376,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
       </div>
       
       <div className="mt-16 text-center text-[9px] text-neutral-700 font-black uppercase tracking-[0.8em] opacity-40">
-        IREME AI • REPUBLIC OF RWANDA
+        JUSTICEHUB • REPUBLIC OF RWANDA
       </div>
     </div>
   );

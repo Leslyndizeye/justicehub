@@ -12,7 +12,7 @@ const IntroSequence: React.FC<IntroSequenceProps> = ({ onFinish }) => {
 
   const segments = [
     { main: "Equity", sub: "FOUNDATION" },
-    { main: "ireme Justice", sub: "THE FUTURE OF RWANDAN LAW" }
+    { main: "JusticeHub", sub: "THE FUTURE OF RWANDAN LAW" }
   ];
 
   useEffect(() => {
@@ -82,7 +82,7 @@ const IntroSequence: React.FC<IntroSequenceProps> = ({ onFinish }) => {
           </div>
         </div>
         <div className="text-center">
-          <h2 className="text-3xl font-black text-white tracking-[0.2em] uppercase">IREME</h2>
+          <h2 className="text-3xl font-black text-white tracking-[0.2em] uppercase">JUSTICEHUB</h2>
         </div>
       </div>
     </div>

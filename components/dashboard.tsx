@@ -151,7 +151,7 @@ const Dashboard: React.FC = () => {
       console.error('Chat failed:', err);
       setMessages(prev => [...prev, {
         id: `err-${Date.now()}`,
-        content: 'ireme encountered an error. Please try again.',
+        content: 'JusticeHub encountered an error. Please try again.',
         sender: 'ai',
         created_at: new Date().toISOString(),
       }]);
@@ -163,7 +163,7 @@ const Dashboard: React.FC = () => {
   if (loading) return (
     <div className="min-h-screen bg-[#05070A] flex flex-col items-center justify-center font-mono">
       <div className="w-12 h-12 border-2 border-legal-gold/20 border-t-legal-gold rounded-full animate-spin mb-6"></div>
-      <div className="text-legal-gold text-[10px] font-black uppercase tracking-widest animate-pulse">Entering ireme...</div>
+      <div className="text-legal-gold text-[10px] font-black uppercase tracking-widest animate-pulse">Entering JusticeHub...</div>
     </div>
   );
 
@@ -229,16 +229,16 @@ const Dashboard: React.FC = () => {
         <header className="p-6 border-b border-white/5 flex items-center justify-between sticky top-0 z-30 bg-[#05070A]/80 backdrop-blur-xl">
           <div className="flex items-center gap-4">
             <div className="lg:hidden w-8 h-8 rounded-lg bg-legal-gold flex items-center justify-center">
-              <span className="text-white text-[10px] font-black">I</span>
+              <span className="text-white text-[10px] font-black">J</span>
             </div>
             <div>
               <div className="text-[9px] font-black text-legal-gold uppercase tracking-[0.4em] mb-0.5">
-                ireme Node: {userRole}
+                JusticeHub Node: {userRole}
               </div>
               <div className="text-sm font-black text-white uppercase tracking-tighter flex items-center gap-2">
                 <span>{user?.displayName || user?.email?.split('@')[0] || 'User'}</span>
                 <span className="w-1 h-1 rounded-full bg-neutral-700"></span>
-                <span className="text-neutral-500">KGL_IREME_01</span>
+                <span className="text-neutral-500">KGL_JUSTICEHUB_01</span>
               </div>
             </div>
           </div>
@@ -260,7 +260,7 @@ const Dashboard: React.FC = () => {
               </div>
               <h2 className="text-2xl font-black uppercase tracking-[0.4em] text-white/40 mb-4">Awaiting Consultation</h2>
               <p className="text-[11px] font-bold uppercase tracking-widest text-neutral-600 leading-relaxed">
-                Consult ireme on Rwandan Law, Policy, or Personal Growth.
+                Consult JusticeHub on Rwandan Law, Policy, or Personal Growth.
               </p>
             </div>
           ) : (
@@ -275,7 +275,7 @@ const Dashboard: React.FC = () => {
               {isAnalysing && (
                 <div className="flex gap-6 justify-start">
                   <div className="w-10 h-10 rounded-2xl bg-legal-gold flex items-center justify-center shrink-0 shadow-xl shadow-legal-gold/20 mt-1">
-                    <span className="text-white text-[10px] font-black">I</span>
+                    <span className="text-white text-[10px] font-black">J</span>
                   </div>
                   <div className="p-6 rounded-[2rem] bg-white/[0.03] border border-white/5 flex items-center gap-3">
                     <div className="flex gap-1.5">
@@ -298,7 +298,7 @@ const Dashboard: React.FC = () => {
               value={currentPrompt}
               onChange={(e) => setCurrentPrompt(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-              placeholder="Consult ireme..."
+              placeholder="Consult JusticeHub..."
               className="relative w-full bg-[#0d0f14] border border-white/10 rounded-[2.2rem] py-6 px-8 pr-20 text-sm md:text-base font-medium focus:border-legal-gold/50 outline-none transition-all resize-none h-[88px] custom-scrollbar focus:shadow-[0_0_50px_rgba(197,160,89,0.05)]"
             />
             <button
@@ -311,7 +311,7 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="mt-5 text-center">
             <span className="text-[8px] font-black text-neutral-600 uppercase tracking-[0.8em]">
-              Republic of Rwanda • ireme AI Node
+              Republic of Rwanda • JusticeHub AI Node
             </span>
           </div>
         </div>

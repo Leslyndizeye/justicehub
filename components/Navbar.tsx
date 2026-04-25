@@ -59,7 +59,7 @@ const Navbar: React.FC<NavbarProps> = ({ onAuthClick }) => {
                 <path d="M2 12L12 17L22 12" />
               </svg>
             </div>
-            <span className="text-lg md:text-xl font-black tracking-tighter text-legal-navy dark:text-white uppercase">Ireme</span>
+            <span className="text-lg md:text-xl font-black tracking-tighter text-legal-navy dark:text-white uppercase">JusticeHub</span>
           </div>
 
           <div className="hidden lg:flex items-center gap-10 text-[9px] font-black text-neutral-500 dark:text-neutral-400 uppercase tracking-[0.3em]">
