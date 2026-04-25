@@ -13,6 +13,7 @@ import FAQ from './components/FAQ';
 import IntroSequence from './components/IntroSequence';
 import AuthPage from './components/AuthPage';
 import Dashboard from './components/dashboard';
+import AdminDashboard from './components/AdminDashboard';
 import { auth } from './components/firebaseConfig';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 
@@ -67,6 +68,31 @@ const LandingPage: React.FC<{ onAuthClick: () => void }> = ({ onAuthClick }) => 
 // ── Protected route ────────────────────────────────────────────
 const ProtectedRoute: React.FC<{ user: User | null; children: React.ReactNode }> = ({ user, children }) => {
   if (!user) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
+};
+
+// ── Admin route ────────────────────────────────────────────────
+const AdminRoute: React.FC<{ user: User | null; children: React.ReactNode }> = ({ user, children }) => {
+  const [role, setRole] = React.useState<string | null>(null);
+  const [checking, setChecking] = React.useState(true);
+  const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+  React.useEffect(() => {
+    if (!user) { setChecking(false); return; }
+    fetch(`${API}/api/users/${user.uid}`)
+      .then(r => r.json())
+      .then(d => setRole(d.role ?? null))
+      .catch(() => setRole(null))
+      .finally(() => setChecking(false));
+  }, [user]);
+
+  if (!user) return <Navigate to="/auth" replace />;
+  if (checking) return (
+    <div className="min-h-screen bg-[#05070A] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-legal-gold/20 border-t-legal-gold rounded-full animate-spin"></div>
+    </div>
+  );
+  if (role !== 'admin') return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -141,6 +167,11 @@ const App: React.FC = () => {
                 <ProtectedRoute user={user as User | null}>
                   <Dashboard />
                 </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <AdminRoute user={user as User | null}>
+                  <AdminDashboard />
+                </AdminRoute>
               } />
               {/* Section deep-links → go to home with hash */}
               <Route path="/solutions"    element={<Navigate to="/#services"      replace />} />

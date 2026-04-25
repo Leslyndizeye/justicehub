@@ -59,7 +59,7 @@ app.get('/api/users/:uid', async (req, res) => {
 // Update user role
 app.patch('/api/users/:uid/role', async (req, res) => {
   const { role } = req.body;
-  const allowed = ['attorney', 'judge', 'citizen'];
+  const allowed = ['attorney', 'judge', 'citizen', 'admin'];
   if (!allowed.includes(role)) return res.status(400).json({ error: 'Invalid role' });
 
   const { data, error } = await supabase
@@ -71,6 +71,78 @@ app.patch('/api/users/:uid/role', async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
+});
+
+// ─── ADMIN ────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/stats
+app.get('/api/admin/stats', async (req, res) => {
+  try {
+    const [users, sessions, messages, docs] = await Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('chat_sessions').select('*', { count: 'exact', head: true }),
+      supabase.from('messages').select('*', { count: 'exact', head: true }),
+      supabase.from('legal_documents').select('*', { count: 'exact', head: true }),
+    ]);
+    res.json({
+      totalUsers: users.count ?? 0,
+      totalSessions: sessions.count ?? 0,
+      totalMessages: messages.count ?? 0,
+      totalDocuments: docs.count ?? 0,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/admin/users
+app.get('/api/admin/users', async (req, res) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// GET /api/admin/sessions
+app.get('/api/admin/sessions', async (req, res) => {
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .select('id, title, created_at, updated_at, user_id, profiles(email, role)')
+    .order('updated_at', { ascending: false })
+    .limit(100);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// GET /api/admin/documents
+app.get('/api/admin/documents', async (req, res) => {
+  const { data, error } = await supabase
+    .from('legal_documents')
+    .select('id, title, category, year, source')
+    .order('category', { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// DELETE /api/admin/documents/:id
+app.delete('/api/admin/documents/:id', async (req, res) => {
+  const { error } = await supabase
+    .from('legal_documents')
+    .delete()
+    .eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// DELETE /api/admin/users/:uid
+app.delete('/api/admin/users/:uid', async (req, res) => {
+  await supabase.from('messages').delete().eq('user_id', req.params.uid);
+  await supabase.from('chat_sessions').delete().eq('user_id', req.params.uid);
+  const { error } = await supabase.from('profiles').delete().eq('id', req.params.uid);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 // ─── CHAT SESSIONS ────────────────────────────────────────────────────────────
