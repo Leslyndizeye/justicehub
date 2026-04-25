@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { auth } from './firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
@@ -54,6 +54,70 @@ const AuthBadge: React.FC<{ provider: string }> = ({ provider }) => (
     {provider === 'google' ? 'Google' : 'Email'}
   </span>
 );
+
+// ── Role dropdown ─────────────────────────────────────────────
+const ROLES = ['citizen', 'attorney', 'judge', 'admin'] as const;
+
+const RoleDropdown: React.FC<{
+  value: string;
+  disabled?: boolean;
+  onChange: (role: string) => void;
+}> = ({ value, disabled, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const m = ROLE_META[value] ?? ROLE_META.citizen;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-40 ${
+          open ? 'bg-white/[0.06] border-[#C5A059]/40 text-white' : 'bg-white/[0.03] border-white/10 text-white hover:border-white/20 hover:bg-white/[0.05]'
+        }`}
+      >
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+        <span>{m.label}</span>
+        <ChevronDown className={`w-3 h-3 text-neutral-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-full mt-1.5 left-0 w-52 bg-[#0d0f14] border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+          <div className="px-3 py-2 border-b border-white/5">
+            <span className="text-[8px] font-black uppercase tracking-widest text-neutral-600">Change Role</span>
+          </div>
+          <div className="p-1">
+            {ROLES.map(r => {
+              const rm = ROLE_META[r];
+              return (
+                <button
+                  key={r}
+                  onClick={() => { onChange(r); setOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all hover:bg-white/[0.06] group ${value === r ? 'bg-white/[0.04]' : ''}`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0 transition-transform group-hover:scale-110" style={{ backgroundColor: rm.color }} />
+                  <div className="flex flex-col leading-tight">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white">{rm.label}</span>
+                    <span className="text-[8px] text-neutral-600 uppercase tracking-widest">{rm.sub}</span>
+                  </div>
+                  {value === r && (
+                    <span className="ml-auto text-[8px] font-black text-[#C5A059]">Active</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ── Custom tooltip for charts ─────────────────────────────────
 const DarkTooltip = ({ active, payload, label }: any) => {
@@ -447,16 +511,11 @@ const AdminDashboard: React.FC = () => {
                       <td className="px-6 py-4"><AuthBadge provider={u.auth_provider ?? 'password'} /></td>
                       <td className="px-6 py-4 text-[11px] text-neutral-500">{new Date(u.created_at).toLocaleDateString()}</td>
                       <td className="px-6 py-4">
-                        <div className="relative inline-block">
-                          <select value={u.role} onChange={e => changeRole(u.id, e.target.value)} disabled={updatingRole === u.id || u.id === user?.uid}
-                            className="appearance-none bg-white/[0.03] border border-white/10 rounded-lg pl-3 pr-8 py-1.5 text-[10px] font-black uppercase text-white outline-none focus:border-[#C5A059]/50 cursor-pointer disabled:opacity-40">
-                            <option value="citizen">Citizen</option>
-                            <option value="attorney">Attorney</option>
-                            <option value="judge">Judge</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-neutral-500 pointer-events-none" />
-                        </div>
+                        <RoleDropdown
+                          value={u.role}
+                          disabled={updatingRole === u.id || u.id === user?.uid}
+                          onChange={role => changeRole(u.id, role)}
+                        />
                       </td>
                       <td className="px-6 py-4 text-right">
                         {u.id !== user?.uid && (

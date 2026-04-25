@@ -253,8 +253,8 @@ const Dashboard: React.FC = () => {
                   <path d="M12 2L2 7L12 12L22 7L12 2Z" /><path d="M2 17L12 22L22 17" /><path d="M2 12L12 17L22 12" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-black uppercase tracking-[0.4em] text-white/40 mb-4">Awaiting Consultation</h2>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-neutral-600 leading-relaxed">
+              <h2 className="text-2xl font-black uppercase tracking-[0.4em] text-white/60 mb-4">Awaiting Consultation</h2>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 leading-relaxed">
                 Consult JusticeHub on Rwandan Law, Policy, or Personal Growth.
               </p>
             </div>
