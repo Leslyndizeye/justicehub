@@ -243,12 +243,6 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex flex-col items-end">
-              <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest animate-pulse">Sovereign Link Verified</span>
-            </div>
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
-          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-10 custom-scrollbar scroll-smooth">

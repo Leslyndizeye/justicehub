@@ -104,6 +104,7 @@ const AdminDashboard: React.FC = () => {
   const [chatFilter, setChatFilter] = useState<'all' | 'user' | 'ai'>('all');
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
   const [confirm, setConfirm]       = useState<{ type: 'user' | 'doc'; id: string | number; label: string } | null>(null);
+  const [selectedChatUser, setSelectedChatUser] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     const [s, u, se, ch, d] = await Promise.all([
@@ -149,20 +150,34 @@ const AdminDashboard: React.FC = () => {
   };
 
   // ── Chart data derived from real data ──────────────────────
-  // Messages per day (last 7 days)
-  const msgByDay = (() => {
+  // New users per day (last 7 days)
+  const usersPerDay = (() => {
     const days: Record<string, number> = {};
     const now = Date.now();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now - i * 86400000);
       days[d.toLocaleDateString('en', { weekday: 'short' })] = 0;
     }
-    chats.forEach(m => {
-      const label = new Date(m.created_at).toLocaleDateString('en', { weekday: 'short' });
+    users.forEach(u => {
+      const label = new Date(u.created_at).toLocaleDateString('en', { weekday: 'short' });
       if (label in days) days[label]++;
     });
-    return Object.entries(days).map(([day, messages]) => ({ day, messages }));
+    return Object.entries(days).map(([day, count]) => ({ day, users: count }));
   })();
+
+  // Unique users who have chats (for left panel)
+  const chatUsers = Array.from(
+    chats.reduce((map, m) => {
+      if (!map.has(m.user_id)) map.set(m.user_id, { id: m.user_id, email: m.profiles?.email ?? m.user_id, role: m.profiles?.role ?? 'citizen', count: 0 });
+      map.get(m.user_id)!.count++;
+      return map;
+    }, new Map<string, { id: string; email: string; role: string; count: number }>())
+  ).map(([, v]) => v);
+
+  // Messages for the selected user, sorted chronologically
+  const selectedUserChats = selectedChatUser
+    ? chats.filter(m => m.user_id === selectedChatUser).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    : [];
 
   // Users by role
   const usersByRole = Object.entries(
@@ -294,12 +309,12 @@ const AdminDashboard: React.FC = () => {
 
             {/* Charts row 1 */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Area chart — messages last 7 days */}
+              {/* Area chart — new users last 7 days */}
               <div className="lg:col-span-2 bg-white/[0.03] border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-base font-black text-white">Message Activity</h2>
-                    <p className="text-neutral-500 text-xs mt-0.5">Daily messages over the past 7 days</p>
+                    <h2 className="text-base font-black text-white">User Registrations</h2>
+                    <p className="text-neutral-500 text-xs mt-0.5">New signups over the past 7 days</p>
                   </div>
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#C5A059]/10 border border-[#C5A059]/20">
                     <TrendingUp className="w-3 h-3 text-[#C5A059]" />
@@ -307,7 +322,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
                 <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={msgByDay}>
+                  <AreaChart data={usersPerDay}>
                     <defs>
                       <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%"  stopColor={GOLD} stopOpacity={0.25} />
@@ -316,14 +331,14 @@ const AdminDashboard: React.FC = () => {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                     <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} dy={8} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                    <YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
                     <Tooltip content={<DarkTooltip />} />
-                    <Area type="monotone" dataKey="messages" name="Messages" stroke={GOLD} strokeWidth={2.5} fill="url(#goldGrad)" />
+                    <Area type="monotone" dataKey="users" name="New Users" stroke={GOLD} strokeWidth={2.5} fill="url(#goldGrad)" />
                   </AreaChart>
                 </ResponsiveContainer>
                 <div className="flex items-center gap-2 mt-4 pt-4 border-t border-white/5">
                   <TrendingUp className="w-4 h-4 text-[#C5A059]" />
-                  <span className="text-xs text-neutral-500">Showing total messages for the last 7 days</span>
+                  <span className="text-xs text-neutral-500">Showing new user registrations for the last 7 days</span>
                 </div>
               </div>
 
@@ -498,45 +513,109 @@ const AdminDashboard: React.FC = () => {
 
         {/* ── CHATS ── */}
         {tab === 'chats' && (
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-black uppercase tracking-tighter">Chat Messages</h2>
-                <p className="text-neutral-500 text-sm mt-1">Last 200 messages across all users and sessions.</p>
-              </div>
-              <div className="flex gap-3 flex-wrap">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
-                  <input type="text" placeholder="Search messages..." value={chatSearch} onChange={e => setChatSearch(e.target.value)}
-                    className="pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-sm text-white placeholder-neutral-600 outline-none focus:border-[#C5A059]/50 w-52" />
+          <div className="flex flex-col gap-4 h-[calc(100vh-220px)]">
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-tighter">Chat Messages</h2>
+              <p className="text-neutral-500 text-sm mt-1">Select a user to view their full conversation history.</p>
+            </div>
+            <div className="flex gap-4 flex-1 min-h-0">
+
+              {/* Left panel — user list */}
+              <div className="w-72 shrink-0 bg-white/[0.02] border border-white/5 rounded-2xl flex flex-col overflow-hidden">
+                <div className="p-3 border-b border-white/5">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />
+                    <input type="text" placeholder="Search users..." value={chatSearch} onChange={e => setChatSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 rounded-xl bg-white/[0.03] border border-white/10 text-sm text-white placeholder-neutral-600 outline-none focus:border-[#C5A059]/50" />
+                  </div>
                 </div>
-                <div className="flex rounded-xl overflow-hidden border border-white/10">
-                  {(['all', 'user', 'ai'] as const).map(f => (
-                    <button key={f} onClick={() => setChatFilter(f)}
-                      className={`px-4 py-2.5 text-[9px] font-black uppercase tracking-widest transition-all ${chatFilter === f ? 'bg-[#C5A059] text-black' : 'bg-white/[0.02] text-neutral-500 hover:text-white'}`}>
-                      {f === 'all' ? 'All' : f === 'user' ? 'User' : 'AI'}
+                <div className="flex-1 overflow-y-auto divide-y divide-white/[0.03]">
+                  {chatUsers.filter(u => u.email.toLowerCase().includes(chatSearch.toLowerCase())).map(u => (
+                    <button key={u.id} onClick={() => setSelectedChatUser(u.id)}
+                      className={`w-full flex items-center gap-3 p-4 text-left transition-all hover:bg-white/[0.03] ${selectedChatUser === u.id ? 'bg-[#C5A059]/[0.08] border-l-2 border-[#C5A059]' : 'border-l-2 border-transparent'}`}>
+                      <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                        <span className="text-[11px] font-black text-white">{u.email.substring(0, 2).toUpperCase()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{u.email}</p>
+                        <p className="text-[10px] text-neutral-600">{u.count} messages</p>
+                      </div>
+                      <RoleBadge role={u.role} />
                     </button>
                   ))}
+                  {chatUsers.length === 0 && (
+                    <div className="p-8 text-center text-neutral-600 text-sm">No chats yet.</div>
+                  )}
                 </div>
               </div>
-            </div>
-            <div className="space-y-3">
-              {filteredChats.map(m => (
-                <div key={m.id} className={`p-5 rounded-2xl border transition-all ${m.sender === 'ai' ? 'bg-[#C5A059]/[0.03] border-[#C5A059]/10' : 'bg-white/[0.02] border-white/5'}`}>
-                  <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${m.sender === 'ai' ? 'bg-[#C5A059]/10 border-[#C5A059]/20 text-[#C5A059]' : 'bg-white/5 border-white/10 text-neutral-400'}`}>
-                        {m.sender === 'ai' ? 'JusticeHub AI' : 'User'}
-                      </span>
-                      {m.profiles?.role && <RoleBadge role={m.profiles.role} />}
-                      <span className="text-[9px] text-neutral-600">{m.profiles?.email ?? m.user_id}</span>
-                    </div>
-                    <span className="text-[9px] text-neutral-600 whitespace-nowrap">{new Date(m.created_at).toLocaleString()}</span>
+
+              {/* Right panel — conversation */}
+              <div className="flex-1 bg-white/[0.02] border border-white/5 rounded-2xl flex flex-col overflow-hidden min-w-0">
+                {!selectedChatUser ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3 text-neutral-600">
+                    <MessageSquare className="w-10 h-10 opacity-25" />
+                    <p className="text-sm">Select a user to view their conversation</p>
                   </div>
-                  <p className="text-sm text-neutral-300 leading-relaxed line-clamp-4">{m.content}</p>
-                </div>
-              ))}
-              {filteredChats.length === 0 && <div className="py-16 text-center text-neutral-600 text-sm">No messages found.</div>}
+                ) : (
+                  <>
+                    {/* Conversation header */}
+                    <div className="p-4 border-b border-white/5 flex items-center gap-3 shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                        <span className="text-[11px] font-black text-white">
+                          {(chatUsers.find(u => u.id === selectedChatUser)?.email ?? 'U').substring(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{chatUsers.find(u => u.id === selectedChatUser)?.email}</p>
+                        <p className="text-[10px] text-neutral-600">{selectedUserChats.length} messages total</p>
+                      </div>
+                      <RoleBadge role={chatUsers.find(u => u.id === selectedChatUser)?.role ?? 'citizen'} showSub />
+                    </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                      {(() => {
+                        let lastSession = '';
+                        return selectedUserChats.map(m => {
+                          const sessionTitle = m.chat_sessions?.title ?? '';
+                          const showSep = sessionTitle && sessionTitle !== lastSession;
+                          if (showSep) lastSession = sessionTitle;
+                          return (
+                            <React.Fragment key={m.id}>
+                              {showSep && (
+                                <div className="flex items-center gap-3 py-2">
+                                  <div className="h-px flex-1 bg-white/5" />
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 px-2">{sessionTitle}</span>
+                                  <div className="h-px flex-1 bg-white/5" />
+                                </div>
+                              )}
+                              <div className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[75%] rounded-2xl px-4 py-3 ${
+                                  m.sender === 'user'
+                                    ? 'bg-white/[0.06] border border-white/10 rounded-tr-sm'
+                                    : 'bg-[#C5A059]/[0.08] border border-[#C5A059]/15 rounded-tl-sm'
+                                }`}>
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <span className={`text-[8px] font-black uppercase tracking-widest ${m.sender === 'ai' ? 'text-[#C5A059]' : 'text-neutral-500'}`}>
+                                      {m.sender === 'ai' ? 'JusticeHub AI' : 'User'}
+                                    </span>
+                                    <span className="text-[8px] text-neutral-700">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  </div>
+                                  <p className="text-sm text-neutral-200 leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                                </div>
+                              </div>
+                            </React.Fragment>
+                          );
+                        });
+                      })()}
+                      {selectedUserChats.length === 0 && (
+                        <div className="text-center text-neutral-600 text-sm py-10">No messages found.</div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
             </div>
           </div>
         )}
