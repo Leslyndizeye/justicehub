@@ -105,19 +105,24 @@ const AdminRoute: React.FC<{ user: User | null; children: React.ReactNode }> = (
 };
 
 // ── Smart redirect after login ─────────────────────────────────
-// Checks role then sends admin → /adminxt, others → /dashboard
+// Upserts profile (creates if new, preserves role if existing) then redirects
 const PostLoginRedirect: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
-  const [done, setDone] = React.useState(false);
 
   React.useEffect(() => {
-    getUserRole(user.uid).then(role => {
-      navigate(role === 'admin' ? '/adminxt' : '/dashboard', { replace: true });
-      setDone(true);
-    });
+    const provider = user.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'password';
+    fetch(`${API}/api/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: user.uid, email: user.email, auth_provider: provider }),
+    })
+      .then(r => r.json())
+      .then(profile => {
+        navigate(profile.role === 'admin' ? '/adminxt' : '/dashboard', { replace: true });
+      })
+      .catch(() => navigate('/dashboard', { replace: true }));
   }, [user.uid]);
 
-  if (done) return null;
   return (
     <div className="min-h-screen bg-[#05070A] flex items-center justify-center">
       <div className="w-8 h-8 border-2 border-legal-gold/20 border-t-legal-gold rounded-full animate-spin"></div>

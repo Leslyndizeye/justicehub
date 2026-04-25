@@ -30,16 +30,36 @@ async function searchLegalDocs(query) {
 // ─── USERS ───────────────────────────────────────────────────────────────────
 
 // Create or update a user profile (called after Firebase login)
+// IMPORTANT: never overwrite role for existing users — only set role on first creation
 app.post('/api/users', async (req, res) => {
-  const { uid, email, role, auth_provider } = req.body;
+  const { uid, email, auth_provider } = req.body;
   if (!uid || !email) return res.status(400).json({ error: 'uid and email required' });
 
-  const { data, error } = await supabase
+  // Check if profile already exists
+  const { data: existing } = await supabase
     .from('profiles')
-    .upsert({ id: uid, email, role: role || 'citizen', auth_provider: auth_provider || 'password' }, { onConflict: 'id' })
-    .select()
+    .select('id, role, auth_provider')
+    .eq('id', uid)
     .single();
 
+  if (existing) {
+    // Profile exists: preserve role, only refresh email and auth_provider
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ email, auth_provider: auth_provider || existing.auth_provider || 'password' })
+      .eq('id', uid)
+      .select()
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
+  }
+
+  // New profile: create with citizen role
+  const { data, error } = await supabase
+    .from('profiles')
+    .insert({ id: uid, email, role: 'citizen', auth_provider: auth_provider || 'password' })
+    .select()
+    .single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
