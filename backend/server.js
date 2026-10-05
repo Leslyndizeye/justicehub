@@ -234,13 +234,25 @@ app.get('/api/messages/:sessionId', async (req, res) => {
 
 app.post('/api/chat', async (req, res) => {
   const { uid, sessionId, message, role } = req.body;
+  const streaming = req.body.stream === true;
   if (typeof uid !== 'string' || !uid.trim() || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ error: 'uid and a nonempty message are required' });
   }
 
+  const generation = new AbortController();
+  let complete = false;
+  let streamedReply = '';
+  let activeSessionId = sessionId;
+  let replySaved = false;
+  let heartbeat;
+  const onDisconnect = () => { if (!complete) generation.abort(); };
+  res.on('close', onDisconnect);
+  const sendEvent = (event, data) => {
+    if (!res.destroyed && !res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
   try {
     // 1. Create session if not provided
-    let activeSessionId = sessionId;
     if (!activeSessionId) {
       const { data: session, error: sessionErr } = await supabase
         .from('chat_sessions')
@@ -284,8 +296,7 @@ app.post('/api/chat', async (req, res) => {
     const legalDocs = await searchLegalDocs(message);
     const messages = buildChatMessages({ message, role, history, legalDocs });
 
-    // 5. Call Groq API
-    const completion = await groq.chat.completions.create({
+    const request = {
       model: groqModel,
       messages,
       temperature: 0.4,
@@ -293,9 +304,33 @@ app.post('/api/chat', async (req, res) => {
       ...(['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(groqModel)
         ? { reasoning_effort: 'medium', include_reasoning: false }
         : {}),
-    });
+    };
 
-    const aiText = completion.choices[0]?.message?.content?.trim();
+    // Stream actual model tokens to the UI. JSON callers retain the existing API.
+    if (streaming) {
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+      sendEvent('session', { sessionId: activeSessionId });
+      heartbeat = setInterval(() => {
+        if (!res.destroyed && !res.writableEnded) res.write(': keepalive\n\n');
+      }, 15000);
+      const tokens = await groq.chat.completions.create({ ...request, stream: true }, { signal: generation.signal });
+      for await (const chunk of tokens) {
+        const text = chunk.choices[0]?.delta?.content;
+        if (text) {
+          streamedReply += text;
+          sendEvent('token', { text });
+        }
+      }
+      generation.signal.throwIfAborted();
+    } else {
+      const completion = await groq.chat.completions.create(request, { signal: generation.signal });
+      streamedReply = completion.choices[0]?.message?.content || '';
+    }
+
+    const aiText = streamedReply.trim();
     if (!aiText) throw new Error('The AI returned an empty answer. Please try again.');
 
     // 5. Save AI response to Supabase
@@ -306,6 +341,7 @@ app.post('/api/chat', async (req, res) => {
       sender: 'ai',
     });
     if (aiMessageErr) throw aiMessageErr;
+    replySaved = true;
 
     // 6. Update session title if it's the first message
     await supabase
@@ -313,11 +349,37 @@ app.post('/api/chat', async (req, res) => {
       .update({ updated_at: new Date().toISOString() })
       .eq('id', activeSessionId);
 
-    res.json({ reply: aiText, sessionId: activeSessionId });
+    complete = true;
+    if (streaming) {
+      sendEvent('done', { reply: aiText, sessionId: activeSessionId });
+      res.end();
+    } else {
+      res.json({ reply: aiText, sessionId: activeSessionId });
+    }
 
   } catch (err) {
+    if (generation.signal.aborted) {
+      if (streaming && streamedReply.trim() && !replySaved && activeSessionId) {
+        const { error } = await supabase.from('messages').insert({
+          session_id: activeSessionId,
+          user_id: uid,
+          content: `${streamedReply.trim()}\n\n*Response stopped.*`,
+          sender: 'ai',
+        });
+        if (error) console.error('Stopped reply could not be saved:', error.message);
+      }
+      return;
+    }
     console.error('Chat error:', err?.message || err);
-    res.status(500).json({ error: err?.message || 'AI request failed' });
+    if (res.headersSent) {
+      sendEvent('error', { error: 'The reply could not be completed. Please try again.' });
+      res.end();
+    } else {
+      res.status(500).json({ error: err?.message || 'AI request failed' });
+    }
+  } finally {
+    clearInterval(heartbeat);
+    res.off('close', onDisconnect);
   }
 });
 
