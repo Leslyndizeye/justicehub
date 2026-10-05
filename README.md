@@ -152,6 +152,7 @@ Set frontend `VITE_API_URL` to the deployed backend URL before building. Add the
 
 - The API does not verify Firebase ID tokens or protect admin routes. Matching a session to a supplied user ID is not authentication; API authorization needs work before exposing private data or admin operations publicly.
 - The checked-in SQL does not reproduce the full database, and Firebase rules are not versioned here.
+- The homepage references `frontend/assets/videos/video1.mp4`, but the folder currently contains only `video10.mp4`. Supply the intended video or update the reference.
 - There is no admin setup script or license file.
 
 For setup problems, check the backend terminal and browser console. Missing-key errors usually mean an empty backend `.env` value. A model error usually means an incorrect `GROQ_MODEL` or unavailable model. Browser CORS errors can occur when the frontend runs on an origin other than `http://localhost:5173`; set `FRONTEND_URL` to the actual origin and restart the backend.
