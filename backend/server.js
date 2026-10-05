@@ -3,8 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import Groq from 'groq-sdk';
 import supabase from './supabase.js';
-import { buildChatMessages } from './chatPrompt.js';
-import { createSearchTracker, searchOptions, webSearchEnabled } from './chatSearch.js';
+import { createChatProvider, publicChatError } from './chatProvider.js';
 
 const app = express();
 const allowedOrigins = process.env.FRONTEND_URL
@@ -13,9 +12,16 @@ const allowedOrigins = process.env.FRONTEND_URL
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// Our provider handles one fallback explicitly; do not let SDK retries multiply rate-limited requests.
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
 const groqModel = process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-120b';
-const searchEnabled = webSearchEnabled(groqModel);
+const chatProvider = createChatProvider({
+  client: groq,
+  model: groqModel,
+  fallbackModel: process.env.GROQ_FALLBACK_MODEL?.trim() || 'openai/gpt-oss-20b',
+  searchSetting: process.env.GROQ_WEB_SEARCH,
+  reasoningEffort: process.env.GROQ_REASONING_EFFORT?.trim() || 'medium',
+});
 
 // ─── RAG: search Rwanda legal documents ──────────────────────
 async function searchLegalDocs(query) {
@@ -247,7 +253,6 @@ app.post('/api/chat', async (req, res) => {
   let activeSessionId = sessionId;
   let replySaved = false;
   let heartbeat;
-  const search = createSearchTracker();
   const onDisconnect = () => { if (!complete) generation.abort(); };
   res.on('close', onDisconnect);
   const sendEvent = (event, data) => {
@@ -297,18 +302,6 @@ app.post('/api/chat', async (req, res) => {
 
     // Build conversational instructions and grounded reference context.
     const legalDocs = await searchLegalDocs(message);
-    const messages = buildChatMessages({ message, role, history, legalDocs, searchEnabled });
-
-    const request = {
-      model: groqModel,
-      messages,
-      temperature: 0.4,
-      max_completion_tokens: 3072,
-      ...searchOptions(groqModel, message),
-      ...(['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(groqModel)
-        ? { reasoning_effort: 'medium', include_reasoning: false }
-        : {}),
-    };
 
     // Stream actual model tokens to the UI. JSON callers retain the existing API.
     if (streaming) {
@@ -320,28 +313,14 @@ app.post('/api/chat', async (req, res) => {
       heartbeat = setInterval(() => {
         if (!res.destroyed && !res.writableEnded) res.write(': keepalive\n\n');
       }, 15000);
-      const tokens = await groq.chat.completions.create({ ...request, stream: true }, { signal: generation.signal });
-      for await (const chunk of tokens) {
-        const delta = chunk.choices[0]?.delta;
-        if (delta?.executed_tools?.length && search.observe(delta.executed_tools)) {
-          sendEvent('status', { text: 'Searching the web…', webSearch: true });
-        }
-        const text = delta?.content;
-        if (text) {
-          streamedReply += text;
-          sendEvent('token', { text });
-        }
-      }
-      generation.signal.throwIfAborted();
-    } else {
-      const completion = await groq.chat.completions.create(request, { signal: generation.signal });
-      const answer = completion.choices[0]?.message;
-      search.observe(answer?.executed_tools);
-      streamedReply = answer?.content || '';
     }
-
-    const aiText = search.finish(streamedReply);
-    if (!aiText) throw new Error('The AI returned an empty answer. Please try again.');
+    const aiText = await chatProvider.reply({
+      message, role, history, legalDocs, streaming, signal: generation.signal,
+      onEvent: (event, data) => {
+        if (event === 'token') streamedReply += data.text;
+        if (streaming) sendEvent(event, data);
+      },
+    });
 
     // 5. Save AI response to Supabase
     const { error: aiMessageErr } = await supabase.from('messages').insert({
@@ -380,12 +359,14 @@ app.post('/api/chat', async (req, res) => {
       }
       return;
     }
-    console.error('Chat error:', err?.message || err);
+    const publicError = publicChatError(err);
+    console.error('Chat error:', err?.status || 'internal', err?.error?.error?.code || err?.error?.code || err?.code || 'request_failed');
     if (res.headersSent) {
-      sendEvent('error', { error: 'The reply could not be completed. Please try again.' });
+      sendEvent('error', publicError);
       res.end();
     } else {
-      res.status(500).json({ error: err?.message || 'AI request failed' });
+      if (publicError.retryAfterSeconds) res.setHeader('Retry-After', String(publicError.retryAfterSeconds));
+      res.status(publicError.status).json(publicError);
     }
   } finally {
     clearInterval(heartbeat);

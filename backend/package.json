@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "eval:chat": "node evals/assistant-behavior.mjs",
     "build": "echo 'No build step required'",
     "start": "node server.js",
     "dev": "node --watch server.js"

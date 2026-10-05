@@ -6,8 +6,9 @@ export function webSearchEnabled(model, setting = process.env.GROQ_WEB_SEARCH) {
 
 export function searchOptions(model, message, setting) {
   if (!webSearchEnabled(model, setting)) return {};
-  const needsSearch = /\b(news|latest|current|today|yesterday|this week|this month|recent(?:ly)?|up[- ]to[- ]date)\b|\b(search|browse|look\s*up|check|verify)\b.{0,35}\b(web|internet|online|sources?)\b/i.test(message);
-  return { tools: [{ type: 'browser_search' }], tool_choice: needsSearch ? 'required' : 'auto' };
+  // A vague current-information question may need clarification before any search.
+  // Requiring a tool here makes Groq reject an otherwise useful clarifying answer.
+  return { tools: [{ type: 'browser_search' }], tool_choice: 'auto' };
 }
 
 function safeSource(url, title) {
@@ -31,9 +32,11 @@ export function createSearchTracker() {
         used = true;
         for (const result of tool.search_results?.results || []) {
           const source = safeSource(result.url, result.title);
-          if (source) sources.set(source.url, source);
+          if (source && !sources.has(source.url)) sources.set(source.url, source);
         }
-        const url = tool.output?.match(/(?:^|\n)(?:L\d+:\s*)?URL:\s*(https?:\/\/\S+)/)?.[1];
+        // Long PDF URLs may wrap onto the next numbered line in Groq's browser output.
+        const pageOutput = tool.output?.replace(/^L\d+: ?/gm, '');
+        const url = pageOutput?.match(/(?:^|\n)URL:\s*(https?:\/\/\S+)/)?.[1];
         if (url && tool.name !== 'browser.search') {
           const source = safeSource(url);
           if (source) {
@@ -57,9 +60,10 @@ export function createSearchTracker() {
       for (const source of sources.values()) {
         if (answer.includes(source.url)) linked.add(source.url);
       }
-      // If the model omitted its links, show pages actually opened, rather than inventing citations.
-      if (used && !linked.size && opened.size) {
-        answer += '\n\nSources: ' + [...opened].slice(0, 3).map(url => {
+      // A generic homepage link must not hide the specific pages actually checked.
+      const missingLinks = [...opened].filter(url => !linked.has(url));
+      if (used && missingLinks.length) {
+        answer += '\n\nPages checked: ' + missingLinks.slice(0, 3).map(url => {
           const source = sources.get(url);
           return `[${source.title}](${source.url})`;
         }).join(', ');
