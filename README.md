@@ -186,8 +186,3 @@ Set the deployed backend URL as frontend `VITE_API_URL`, set the frontend origin
 
 The API currently accepts user IDs and roles supplied by callers without verifying Firebase ID tokens or protecting admin routes. Chat checks that a session belongs to the supplied user ID, but that does not authenticate the caller; other routes also need ownership checks. Frontend redirects and CORS do not enforce API permissions. These are concrete implementation gaps to address before exposing user data or admin operations publicly.
 
-## Collaboration
-
-Agree on cloud project access, development data, the admin test account, and which database migrations have already been applied. Work on a branch and submit a pull request with the change and verification steps. Keep lockfiles with dependency changes and document schema/configuration changes alongside the code.
-
-No license file is included; the owner should decide the project's license and sharing terms.
