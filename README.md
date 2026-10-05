@@ -66,6 +66,7 @@ The `.env` files are ignored by Git. Share filled-in files privately; the templa
 | `backend/.env` | `SUPABASE_ANON_KEY` | Required Supabase key read by the current client. |
 | `backend/.env` | `GROQ_API_KEY` | Required Groq API key. |
 | `backend/.env` | `GROQ_MODEL` | Chat model. Defaults to `openai/gpt-oss-120b`. |
+| `backend/.env` | `GROQ_WEB_SEARCH` | Enables built-in internet search by default on supported models. Set `false` to disable. |
 | `backend/.env` | `FRONTEND_URL` | Additional allowed frontend origin. Local `http://localhost:5173` is always allowed. |
 | `backend/.env` | `PORT` | Backend port. Defaults to `4000`. |
 
@@ -129,6 +130,7 @@ If PowerShell blocks `npm.ps1`, use `npm.cmd` instead of `npm`. The frontend als
 | `frontend` | `npx tsc --noEmit` | Checks TypeScript. |
 | `backend` | `npm run dev` | Starts the API with automatic restart when source files change. |
 | `backend` | `npm start` | Starts the API without automatic restart. |
+| `backend` | `npm test` | Checks search configuration, source links, and conversation instructions without external API calls. |
 
 The backend needs no compilation step. Its `build` script currently only prints a message.
 
@@ -137,6 +139,10 @@ The backend needs no compilation step. Its `build` script currently only prints 
 Routes are `/`, `/auth`, `/dashboard`, and `/adminxt`. New Supabase profiles start as `citizen`; admin access depends on `profiles.role`. Signup also writes a role to Firestore, but these role records are not synchronized.
 
 Chat streams replies as they are generated. The Stop button cancels generation and preserves any partial answer already generated. Follow-ups use the last 20 saved messages in that session. Start a new session for a fresh conversation.
+
+JusticeHub answers general questions as well as legal questions. With `openai/gpt-oss-120b` or `openai/gpt-oss-20b`, Groq's [built-in browser search](https://console.groq.com/docs/tool-use/built-in-tools/browser-search) can look up news and other changing information using the existing backend Groq key. No separate search key is needed. Requests for news, latest information, or an internet lookup require a search; other questions allow the model to decide. Source links appear in the answer, and the chat shows when web search is used. The current date is included in every request to help it find recent information.
+
+Search availability and usage charges depend on your Groq account. Changing to another model may remove search support. If search is disabled or a lookup fails, the assistant should explain that it cannot verify current information. Web results can still be incomplete or outdated; check the linked source and publication date for important decisions.
 
 Response instructions are in `backend/chatPrompt.js`. Reporting contact references and their official source links are in `backend/officialContacts.js`; recheck the sources when updating contacts. Message formatting is handled by `frontend/components/ChatMarkdown.tsx`.
 

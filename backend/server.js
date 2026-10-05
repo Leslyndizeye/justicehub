@@ -4,6 +4,7 @@ import cors from 'cors';
 import Groq from 'groq-sdk';
 import supabase from './supabase.js';
 import { buildChatMessages } from './chatPrompt.js';
+import { createSearchTracker, searchOptions, webSearchEnabled } from './chatSearch.js';
 
 const app = express();
 const allowedOrigins = process.env.FRONTEND_URL
@@ -14,6 +15,7 @@ app.use(express.json());
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const groqModel = process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-120b';
+const searchEnabled = webSearchEnabled(groqModel);
 
 // ─── RAG: search Rwanda legal documents ──────────────────────
 async function searchLegalDocs(query) {
@@ -245,6 +247,7 @@ app.post('/api/chat', async (req, res) => {
   let activeSessionId = sessionId;
   let replySaved = false;
   let heartbeat;
+  const search = createSearchTracker();
   const onDisconnect = () => { if (!complete) generation.abort(); };
   res.on('close', onDisconnect);
   const sendEvent = (event, data) => {
@@ -294,13 +297,14 @@ app.post('/api/chat', async (req, res) => {
 
     // Build conversational instructions and grounded reference context.
     const legalDocs = await searchLegalDocs(message);
-    const messages = buildChatMessages({ message, role, history, legalDocs });
+    const messages = buildChatMessages({ message, role, history, legalDocs, searchEnabled });
 
     const request = {
       model: groqModel,
       messages,
       temperature: 0.4,
       max_completion_tokens: 3072,
+      ...searchOptions(groqModel, message),
       ...(['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(groqModel)
         ? { reasoning_effort: 'medium', include_reasoning: false }
         : {}),
@@ -318,7 +322,11 @@ app.post('/api/chat', async (req, res) => {
       }, 15000);
       const tokens = await groq.chat.completions.create({ ...request, stream: true }, { signal: generation.signal });
       for await (const chunk of tokens) {
-        const text = chunk.choices[0]?.delta?.content;
+        const delta = chunk.choices[0]?.delta;
+        if (delta?.executed_tools?.length && search.observe(delta.executed_tools)) {
+          sendEvent('status', { text: 'Searching the web…', webSearch: true });
+        }
+        const text = delta?.content;
         if (text) {
           streamedReply += text;
           sendEvent('token', { text });
@@ -327,10 +335,12 @@ app.post('/api/chat', async (req, res) => {
       generation.signal.throwIfAborted();
     } else {
       const completion = await groq.chat.completions.create(request, { signal: generation.signal });
-      streamedReply = completion.choices[0]?.message?.content || '';
+      const answer = completion.choices[0]?.message;
+      search.observe(answer?.executed_tools);
+      streamedReply = answer?.content || '';
     }
 
-    const aiText = streamedReply.trim();
+    const aiText = search.finish(streamedReply);
     if (!aiText) throw new Error('The AI returned an empty answer. Please try again.');
 
     // 5. Save AI response to Supabase

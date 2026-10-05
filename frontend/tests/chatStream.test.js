@@ -30,6 +30,14 @@ test('handles CRLF and ignores keepalive comments', async () => {
   assert.deepEqual(seen, ['token', 'done']);
 });
 
+test('delivers web search status before answer tokens', async () => {
+  const seen = [];
+  const wire = event('status', { text: 'Searching the web…', webSearch: true }) + event('token', { text: 'News' }) + event('done', { reply: 'News', sessionId: 'test' });
+  await readChatStream(response([encoder.encode(wire)]), (name, payload) => seen.push([name, payload]));
+  assert.deepEqual(seen.map(([name]) => name), ['status', 'token', 'done']);
+  assert.equal(seen[0][1].webSearch, true);
+});
+
 test('reports a mid-stream server failure after delivering partial text', async () => {
   const seen = [];
   await assert.rejects(readChatStream(response([encoder.encode(event('token', { text: 'Partial' }) + event('error', { error: 'Provider unavailable' }))]), name => seen.push(name)), /Provider unavailable/);

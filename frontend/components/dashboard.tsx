@@ -15,6 +15,7 @@ interface Message {
   animate?: boolean;
   stopped?: boolean;
   error?: string;
+  webSearch?: boolean;
 }
 
 interface ChatSession {
@@ -200,6 +201,9 @@ const Dashboard: React.FC = () => {
           fullText += data.text;
           setMessages(prev => prev.map(m => m.id === replyId ? { ...m, content: fullText } : m));
         }
+        if (event === 'status' && data.webSearch === true) {
+          setMessages(prev => prev.map(m => m.id === replyId ? { ...m, webSearch: true } : m));
+        }
       });
       if (streamRequest.current !== controller) return;
       setMessages(prev => prev.map(m => m.id === replyId ? { ...m, content: result.reply, streaming: false } : m));
@@ -323,7 +327,7 @@ const Dashboard: React.FC = () => {
               </div>
               <h2 className="text-2xl font-black uppercase tracking-[0.4em] text-white/60 mb-4">Awaiting Consultation</h2>
               <p className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 leading-relaxed">
-                Consult JusticeHub on Rwandan Law, Policy, or Personal Growth.
+                Ask about Rwandan law, everyday questions, or the latest news.
               </p>
             </div>
           ) : (
@@ -399,7 +403,10 @@ const MessageBubble: React.FC<{ message: Message; onEdit: (text: string) => void
         </div>
       )}
       <div className={`group relative min-w-0 ${m.sender === 'ai' ? 'w-full' : 'max-w-[85%]'}`}>
-        {m.sender === 'ai' && <div className="mb-2 text-xs font-semibold text-neutral-400">JusticeHub</div>}
+        {m.sender === 'ai' && <div className="mb-2 flex flex-wrap items-center gap-3 text-xs font-semibold text-neutral-400">
+          <span>JusticeHub</span>
+          {m.webSearch && <span role="status" className="font-normal text-legal-gold">{m.streaming && !m.content ? 'Searching the web…' : 'Web search used'}</span>}
+        </div>}
         <div ref={contentElement} aria-busy={m.sender === 'ai' && writing} className={`text-sm md:text-base font-normal leading-[1.8] ${m.sender === 'ai' ? 'py-1 text-neutral-200' : 'px-5 py-3 rounded-3xl bg-legal-gold text-white'}`}>
           {m.sender === 'ai' ? (
             <>
