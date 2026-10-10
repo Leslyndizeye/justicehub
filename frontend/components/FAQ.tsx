@@ -1,44 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 const faqs = [
-  {
-    q: "How does JusticeHub ensure data sovereignty for Rwandan legal firms?",
-    a: "We operate on local sovereign clouds within Kigali, fully compliant with the Law No. 058/2021 relating to the protection of personal data and privacy, and the 2025 Digital Sovereignty Directives."
-  },
-  {
-    q: "Does the AI support 'Amategeko' terminology in legal Kinyarwanda?",
-    a: "You can ask questions and choose Ikinyarwanda as the reply language. JusticeHub uses a multilingual model with legal reference documents and web search. Important legal terms and conclusions should be checked against the official text."
-  },
-  {
-    q: "Is JusticeHub an official partner of the Rwanda Law Reform Commission (RLRC)?",
-    a: "JusticeHub is a private legal-tech initiative engineered to support legal professionals. While we integrate with RLRC standards and gazette nodes, we are an independent technology provider for Advocates and Legal Officers."
-  },
-  {
-    q: "Can the AI generate documents for the IECMS?",
-    a: "Absolutely. JusticeHub includes a specialized formatting engine that prepares documents specifically for direct upload to the Integrated Electronic Case Management System (IECMS)."
-  }
+  { q: 'Is JusticeHub free?', a: 'Yes. JusticeHub is free during the beta, with no paid plans or payment card required. Usage limits can affect chat availability.' },
+  { q: 'Can I ask in Ikinyarwanda?', a: 'Yes. You can use Ikinyarwanda, English, or French. JusticeHub follows the language of your message automatically. You can ask for a simpler explanation at any time.' },
+  { q: 'Can JusticeHub handle my case for me?', a: 'JusticeHub helps you understand legal information and prepare questions. It does not represent you, file cases, or decide what a court will do.' },
+  { q: 'How do I check an answer?', a: 'Open the source links in the answer and read the official text. Answers and translations can contain mistakes, and laws can change. Check important details before acting on them.' },
+  { q: 'Should I share private case details?', a: 'Share only what is needed to explain your question. Leave out passwords, identity numbers, and other people’s private information. Your messages are processed by AI services, and saved chats remain in your account.' },
 ];
 
-const FAQ: React.FC = () => {
-  return (
-    <section id="faq" className="py-32 px-6 md:px-12 bg-neutral-100 dark:bg-[#05070A]">
-      <div className="max-w-3xl mx-auto">
-        <h2 className="text-3xl font-black mb-12 text-center text-legal-navy dark:text-white tracking-tight uppercase">System Protocol & Compliance</h2>
-        <div className="space-y-4">
-          {faqs.map((f, i) => (
-            <div key={i} className="p-8 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-100 dark:border-white/5 hover:border-legal-gold/30 transition-all duration-500 group cursor-default">
-              <h3 className="text-base font-black mb-4 flex justify-between items-center text-legal-navy dark:text-white group-hover:text-legal-gold transition-colors tracking-tight uppercase">
-                {f.q}
-              </h3>
-              <p className="text-neutral-600 dark:text-neutral-400 text-sm leading-relaxed font-medium">
-                {f.a}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-};
+const FAQ: React.FC = () => (
+  <section id="faq" className="py-24 md:py-32 px-6 md:px-12 bg-neutral-100 dark:bg-[#05070A]">
+    <div className="max-w-3xl mx-auto">
+      <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center text-legal-navy dark:text-white tracking-tight">Questions you may have</h2>
+      <div className="space-y-4">{faqs.map(faq => <div key={faq.q} className="p-7 rounded-2xl bg-neutral-50 dark:bg-white/[0.02] border border-neutral-200 dark:border-white/10"><h3 className="text-base font-semibold mb-3 text-legal-navy dark:text-white">{faq.q}</h3><p className="text-neutral-600 dark:text-neutral-400 text-sm leading-relaxed">{faq.a}</p></div>)}</div>
+    </div>
+  </section>
+);
 
 export default FAQ;

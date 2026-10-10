@@ -2,33 +2,33 @@ import React, { useEffect, useRef, useState } from 'react';
 
 const features = [
   {
-    title: "JURISPRUDENTIAL MODELS",
+    title: "Three languages",
     desc: "Ask questions in Ikinyarwanda, English, or French and review explanations alongside legal references and source links.",
     icon: "⚜"
   },
   {
-    title: "GAZETTE SYNTHESIS",
-    desc: "Real-time extraction of statutory updates from the Journal Officiel. Cite with infallible authority and currency.",
+    title: "Source links",
+    desc: "Open the legal sources linked in an answer and read the original information for yourself.",
     icon: "⁂"
   },
   {
-    title: "LITIGANT GUIDANCE",
-    desc: "AI-driven clarify for family, property, and civil law. Reducing the distance between amategeko and everyday citizens.",
+    title: "Plain explanations",
+    desc: "Ask what a legal word or procedure means, and follow up when you need a simpler explanation.",
     icon: "⊕"
   },
   {
-    title: "FORENSIC DISCOVERY",
-    desc: "Instant search and cross-referencing across voluminous case files to build robust comparative jurisprudential foundations.",
+    title: "Follow-up questions",
+    desc: "Keep exploring a topic in the same chat without starting your explanation again.",
     icon: "⎈"
   },
   {
-    title: "SOVEREIGN DATA CLOUD",
-    desc: "Zero-knowledge encryption for sensitive files, hosted on local Rwandan nodes for absolute data autonomy.",
+    title: "Saved conversations",
+    desc: "Sign in to revisit your earlier questions and continue a saved conversation.",
     icon: "⍟"
   },
   {
-    title: "IECMS OPTIMIZATION",
-    desc: "Statutory formatting for direct upload to the Integrated Electronic Case Management System. Eliminating procedural friction.",
+    title: "Help with research",
+    desc: "Organise questions, review explanations, and explore lawful options while preparing for a case.",
     icon: "⌬"
   }
 ];

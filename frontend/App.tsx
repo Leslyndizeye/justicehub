@@ -24,8 +24,6 @@ import { recoveryState, requestError } from './lib/recoveryState.js';
 
 const API = apiBaseUrl(import.meta.env.VITE_API_URL, import.meta.env.DEV);
 
-export const ThemeContext = React.createContext({ isDark: true, toggleTheme: () => {} });
-
 // ── Landing page ──────────────────────────────────────────────
 const LandingPage: React.FC<{ onAuthClick: () => void }> = ({ onAuthClick }) => (
   <>
@@ -35,8 +33,8 @@ const LandingPage: React.FC<{ onAuthClick: () => void }> = ({ onAuthClick }) => 
       <SocialProof />
       <div className="py-20 bg-neutral-100 dark:bg-[#05070A]">
         <div className="max-w-6xl mx-auto px-6 text-center">
-          <h3 className="text-2xl font-serif italic text-legal-gold mb-4">The Sovereign Standard</h3>
-          <p className="text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto text-sm">Elevating the Rwandan Jurisprudential landscape through high-fidelity cognitive analysis and sovereign data protocols.</p>
+          <h3 className="text-2xl font-serif italic text-legal-gold mb-4">Your questions deserve clear answers.</h3>
+          <p className="text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto text-sm">Get help understanding your rights, responsibilities, and lawful options in Rwanda.</p>
         </div>
       </div>
       <Services />
@@ -56,11 +54,11 @@ const LandingPage: React.FC<{ onAuthClick: () => void }> = ({ onAuthClick }) => 
             </div>
             <span className="text-lg font-bold text-legal-navy dark:text-white uppercase tracking-tighter">JusticeHub</span>
           </div>
-          <p className="max-w-xs text-center md:text-left font-light">Elevating the Rwandan Jurisprudential landscape through sovereign intelligence.</p>
+          <p className="max-w-xs text-center md:text-left font-light">Helping you understand Rwandan law, in your own words.</p>
         </div>
       </div>
       <div className="max-w-6xl mx-auto mt-12 pt-8 border-t border-legal-gold/5 text-center text-[10px] opacity-50 uppercase tracking-[0.2em] font-bold">
-        © 2025 JusticeHub Ltd. Registered in the Republic of Rwanda. RDB Certified.
+        © {new Date().getFullYear()} JusticeHub.
       </div>
     </footer>
   </>
@@ -76,19 +74,12 @@ const Spinner = () => (
 // ── App ───────────────────────────────────────────────────────
 const App: React.FC = () => {
   const [isIntroFinished, setIsIntroFinished] = useState(false);
-  const [isDark, setIsDark] = useState(true);
   const [user, setUser]     = useState<User | null | 'loading'>('loading');
   const [role, setRole]     = useState<string | null>(null);
   const [roleLoading, setRoleLoading] = useState(false);
   const backgroundTimerRef  = useRef<number | null>(null);
   const navigate  = useNavigate();
   const location  = useLocation();
-
-  const toggleTheme = () => {
-    setIsDark(d => !d);
-    document.documentElement.classList.toggle('dark');
-    document.documentElement.classList.toggle('light');
-  };
 
   // Upsert profile → returns role without ever overwriting it
   const resolveRole = async (u: User): Promise<string> => {
@@ -152,7 +143,6 @@ const App: React.FC = () => {
   const isChatPage = /^\/dashboard(?:\/|$)/.test(location.pathname);
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
       <div className={`relative w-full selection:bg-legal-gold/30 ${isChatPage ? 'chat-page-shell' : 'min-h-screen bg-neutral-100 dark:bg-[#05070A]'}`}>
         {showIntro && <IntroSequence onFinish={() => setIsIntroFinished(true)} />}
 
@@ -200,7 +190,6 @@ const App: React.FC = () => {
           )}
         </div>
       </div>
-    </ThemeContext.Provider>
   );
 };
 

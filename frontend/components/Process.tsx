@@ -3,18 +3,18 @@ import React, { useEffect, useRef, useState } from 'react';
 const steps = [
   {
     num: "01",
-    title: "Upload & Ingest",
-    desc: "Simply drop your case files, evidence, or legislation queries into the secure JusticeHub portal."
+    title: "Ask your question",
+    desc: "Sign in and describe what you want to understand. Use Ikinyarwanda, English, or French."
   },
   {
     num: "02",
-    title: "AI Analysis",
-    desc: "Our model cross-references your documents against thousands of Rwandan legal precedents in seconds."
+    title: "Read the explanation",
+    desc: "Review the answer and open any source links to check the original information."
   },
   {
     num: "03",
-    title: "Generate & Refine",
-    desc: "Receive drafts, summaries, or citations. Use our collaborative editor to perfect the final output."
+    title: "Keep the conversation going",
+    desc: "Ask a follow-up or request a simpler explanation. Your saved chats are there when you return."
   }
 ];
 
@@ -40,9 +40,9 @@ const Process: React.FC = () => {
 
       <div className="max-w-6xl mx-auto relative z-10 px-6 md:px-12">
         <div className={`text-center mb-16 md:mb-24 reveal ${isVisible ? 'active' : ''}`}>
-          <div className="text-[9px] font-black uppercase tracking-[0.5em] text-legal-gold mb-3">The Workflow</div>
-          <h2 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tighter mb-4 text-legal-navy dark:text-white leading-tight">Streamlined Justice.</h2>
-          <p className="text-neutral-600 dark:text-neutral-400 text-base font-light max-w-xl mx-auto leading-relaxed">From complex data to actionable legal intelligence in three steps.</p>
+          <div className="text-[9px] font-black uppercase tracking-[0.3em] text-legal-gold mb-3">How it works</div>
+          <h2 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-tighter mb-4 text-legal-navy dark:text-white leading-tight">Start with a question.</h2>
+          <p className="text-neutral-600 dark:text-neutral-400 text-base font-light max-w-xl mx-auto leading-relaxed">Three simple steps to help you understand more.</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-12 md:gap-16 relative">

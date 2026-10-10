@@ -3,30 +3,30 @@ import React, { useState, useEffect, useRef } from 'react';
 const serviceList = [
   {
     id: "01",
-    title: "ADVOCATE ANALYTICS",
-    role: "Learned Counsel",
-    description: "High-precision synthesis of Supreme Court and High Court rulings. Identify winning legal arguments and judicial trends with automated precedent mapping and verified statutory archives.",
+    title: "Know your rights",
+    role: "For everyday life",
+    description: "Ask about work, family, property, and your responsibilities. Get explanations of legal terms and possible next steps.",
     image: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=800"
   },
   {
     id: "02",
-    title: "IECMS OPTIMIZATION",
-    role: "Officer of the Court",
-    description: "Automated preparation and strategic formatting of legal submissions for the Integrated Electronic Case Management System, ensuring 100% compliance with RLRC procedural standards.",
+    title: "Understand documents",
+    role: "Make sense of the words",
+    description: "Paste a passage from a legal document and ask what it means. Remove names and private details before sharing it.",
     image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=800"
   },
   {
     id: "03",
-    title: "MEDIATION PORTAL",
-    role: "Legal Mediator",
-    description: "Empowering mediation committees and citizens with AI-driven translations of statutory law into plain Kinyarwanda, bridging the gap between legislation and public equity.",
+    title: "Ask in your language",
+    role: "Ikinyarwanda, English, or French",
+    description: "Write naturally, in the language you feel comfortable using. JusticeHub follows your language automatically.",
     image: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&q=80&w=800"
   },
   {
     id: "04",
-    title: "STATUTORY SEARCH",
-    role: "Legal Researcher",
-    description: "High-speed semantic search across the entire Official Gazette archive, dating back to historical land laws and post-1994 legislative reforms, synced with sovereign data nodes.",
+    title: "Research the law",
+    role: "For learning and case preparation",
+    description: "Explore legal questions using available documents and source links. Check the official text before making an important decision.",
     image: "https://images.unsplash.com/photo-1505664194779-8beaceb93744?auto=format&fit=crop&q=80&w=800"
   }
 ];
@@ -86,11 +86,11 @@ const Services: React.FC = () => {
         <div className={`mb-20 md:mb-32 reveal ${isVisible ? 'active' : ''}`}>
           <div className="flex items-center gap-4 mb-6 md:mb-8">
             <div className="h-[1px] w-8 md:w-12 bg-legal-gold"></div>
-            <span className="text-[10px] font-black uppercase tracking-[0.5em] text-legal-gold">Legal Engineering & Strategy</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-legal-gold">What you can do</span>
           </div>
           <h2 className="text-4xl md:text-7xl font-black tracking-tighter text-legal-navy dark:text-white uppercase leading-none max-w-4xl">
-            JUSTICEHUB DEPLOYS <br />
-            <span className="font-serif italic text-legal-gold">Sovereign Jurisprudential Precision</span>
+            Make sense of the law. <br />
+            <span className="font-serif italic text-legal-gold">One question at a time.</span>
           </h2>
         </div>
 
@@ -146,7 +146,7 @@ const Services: React.FC = () => {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent z-10"></div>
                   <img src={service.image} alt={service.title} className="w-full h-full object-cover" />
                   <div className="absolute bottom-10 left-8 right-8 text-white z-20">
-                    <div className="text-[9px] font-black uppercase tracking-[0.4em] text-legal-gold mb-2">Legal Infrastructure</div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.3em] text-legal-gold mb-2">JusticeHub</div>
                     <div className="text-xl font-black tracking-tight leading-none uppercase">{service.title} <br/> {service.role}</div>
                   </div>
                 </div>

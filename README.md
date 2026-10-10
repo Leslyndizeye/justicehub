@@ -138,7 +138,7 @@ The API runs at `http://localhost:4000`. Start it from `backend/` so it reads th
 
 Press **Ctrl+C** to stop a server. You only need to install dependencies on first setup or after dependency changes.
 
-If PowerShell blocks `npm.ps1`, use `npm.cmd` instead of `npm`. The frontend also has a pnpm lockfile: when using pnpm for dependency installation, run `pnpm install --frozen-lockfile` inside `frontend/`. Keep dependency changes consistent with the package manager you choose.
+If PowerShell blocks `npm.ps1`, use `npm.cmd` instead of `npm`. Both folders use npm and their checked-in `package-lock.json` files. Use npm when changing dependencies so local setup and hosting install the same versions.
 
 ## Commands
 
@@ -273,7 +273,7 @@ Public launch requires applying [backend/migrations/20261010_private_api_tables.
 
 [Render Free services](https://render.com/docs/free) sleep after 15 minutes idle and can take about a minute to restart. They have monthly limits and are intended for previews or hobby use, not guaranteed production availability. Keep the service on Free; without a payment method, excess bandwidth suspends service rather than billing it. [Vercel Hobby](https://vercel.com/docs/plans/hobby) is for personal, non-commercial use; verify that the beta qualifies before choosing it. Free hosting does not remove Groq or search quotas.
 
-Set the Vercel frontend root directory to `frontend`, build command to `npm run build`, and output directory to `dist`. Enable source files outside the root directory so imports from `shared/` are included. `frontend/vercel.json` handles frontend route rewrites.
+Set the Vercel frontend root directory to `frontend`. `frontend/vercel.json` sets Vite, installation with `npm ci --include=dev`, build command `npm run build`, output directory `dist`, and frontend route rewrites. Enable source files outside the root directory so imports from `shared/` are included. If deployment settings still select pnpm from an older commit, set the Install Command override to `npm ci --include=dev` and redeploy the latest commit. The frontend's obsolete pnpm lockfile and placeholder build-policy file were removed; npm is the project's package manager.
 
 Host the backend separately with working directory `backend` and start command `npm start`. Set its environment variables, the deployed frontend origin, and the port expected by the host. Backend hosting must support streamed responses without proxy buffering.
 

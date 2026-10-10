@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 
 const Hero: React.FC = () => {
   const [showHero, setShowHero] = useState(false);
@@ -49,31 +50,25 @@ const Hero: React.FC = () => {
         <div className="absolute inset-0 grid-lines opacity-10"></div>
       </div>
 
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-12 flex flex-col items-center text-center">
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-6 md:px-12 flex flex-col items-center text-center">
         {showHero && (
           <div className="space-y-12">
-            <div>
-              <span className="inline-block text-[10px] font-black uppercase tracking-[1em] text-legal-gold animate-glitch-fade">
-                Counsel Protocol
-              </span>
-            </div>
-
-            <h1 className="text-4xl md:text-7xl lg:text-[7.5rem] font-black tracking-[-0.05em] text-legal-navy dark:text-white leading-[0.85] flex flex-col">
-              <span className="animate-burst-snap">JURISPRUDENTIAL</span>
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-[-0.03em] text-legal-navy dark:text-white leading-[1.08] flex flex-col">
+              <span className="animate-burst-snap">Understand your rights.</span>
               <span className="text-legal-gold font-serif italic relative inline-block animate-burst-snap animate-delay-200">
-                EQUITY.
+                Ask in your own words.
               </span>
             </h1>
 
             <div className="max-w-2xl mx-auto space-y-12">
               <p className="text-base md:text-xl text-neutral-600 dark:text-neutral-400 font-medium leading-relaxed tracking-tight animate-fade-in-up animate-delay-500">
-                Empowering advocates, magistrates, and litigants with high-fidelity cognitive analysis.
+                Ask about Rwandan law, legal documents, and everyday questions in Ikinyarwanda, English, or French.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-fade-in-up animate-delay-1000">
-                <button className="px-12 py-5 bg-neutral-900 dark:bg-white text-white dark:text-black font-black uppercase tracking-[0.4em] text-[10px] rounded-full hover:bg-legal-gold hover:text-white transition-all">
-                  Initiate Counsel
-                </button>
+                <Link to="/auth" className="px-10 py-4 bg-neutral-900 dark:bg-white text-white dark:text-black font-semibold text-sm rounded-full hover:bg-legal-gold hover:text-white transition-all">
+                  Start for free
+                </Link>
               </div>
             </div>
           </div>
