@@ -1,0 +1,46 @@
+# Backend configuration for Render; the frontend remains on Vercel.
+# Public launch requires the API authorization fixes described in README.md.
+# Supply environment values in Render, never in this file.
+services:
+  - type: web
+    name: justicehub-api
+    runtime: node
+    plan: free
+    buildCommand: npm --prefix backend ci
+    startCommand: npm --prefix backend start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        value: ireme-30164
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_FALLBACK_MODEL
+        value: openai/gpt-oss-20b
+      - key: GROQ_REASONING_EFFORT
+        value: medium
+      - key: GROQ_WEB_SEARCH
+        value: "false"
+      - key: WEB_SEARCH_PROVIDER
+        value: tavily
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: TAVILY_MONTHLY_LIMIT
+        value: "900"
+      - key: GROQ_SEARCH_FALLBACK
+        value: "true"
+      - key: GROQ_SEARCH_MODEL
+        value: openai/gpt-oss-20b

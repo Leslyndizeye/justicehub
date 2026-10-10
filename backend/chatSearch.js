@@ -1,3 +1,5 @@
+import { languageCopy } from './chatLanguage.js';
+
 const browserModels = new Set(['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'openai/gpt-oss-safeguard-20b']);
 
 export function webSearchEnabled(model, setting = process.env.GROQ_WEB_SEARCH) {
@@ -20,7 +22,7 @@ function safeSource(url, title) {
 }
 
 // Built-in browser events expose real result URLs and opened pages separately from answer tokens.
-export function createSearchTracker() {
+export function createSearchTracker({ language = 'en' } = {}) {
   const sources = new Map();
   const citations = new Map();
   const opened = new Set();
@@ -51,7 +53,7 @@ export function createSearchTracker() {
     finish(text) {
       if (!text.trim()) return '';
       const linked = new Set();
-      let answer = text.replace(/〖(\d+)(?:†[^〗]*)?〗/g, (_, index) => {
+      let answer = text.replace(/[〖【](\d+)(?:†[^〗】]*)?[〗】]/g, (_, index) => {
         const source = citations.get(index);
         if (!source) return '';
         linked.add(source.url);
@@ -63,7 +65,7 @@ export function createSearchTracker() {
       // A generic homepage link must not hide the specific pages actually checked.
       const missingLinks = [...opened].filter(url => !linked.has(url));
       if (used && missingLinks.length) {
-        answer += '\n\nPages checked: ' + missingLinks.slice(0, 3).map(url => {
+        answer += `\n\n${languageCopy(language).pages}: ` + missingLinks.slice(0, 3).map(url => {
           const source = sources.get(url);
           return `[${source.title}](${source.url})`;
         }).join(', ');

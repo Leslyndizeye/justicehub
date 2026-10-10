@@ -44,7 +44,7 @@ const InputField: React.FC<InputFieldProps> = ({ label, type, value, onChange, p
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        autoComplete={isPassword ? (isSignup ? 'new-password' : 'current-password') : 'email'}
+        autoComplete={isPassword && isSignup ? 'new-password' : 'off'}
         className={`w-full px-6 py-4 rounded-2xl border border-neutral-100 dark:border-white/10 bg-white dark:bg-white/[0.04] text-neutral-900 dark:text-white focus:border-legal-gold dark:focus:border-legal-gold focus:ring-1 focus:ring-legal-gold outline-none text-base font-medium transition-all ${isPassword ? 'pr-14' : ''}`}
         required={required}
       />
@@ -283,8 +283,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
                 <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Secure Reset for</span>
                 <div className="text-sm font-bold text-white mt-1">{email || "Authorized User"}</div>
               </div>
-              <InputField label="New Security Key" type="password" value={password} onChange={setPassword} placeholder="••••••••" isPassword showPassword={showPassword} onTogglePassword={togglePw} isSignup />
-              <InputField label="Confirm Security Key" type="password" value={confirmPassword} onChange={setConfirmPassword} placeholder="••••••••" isPassword showPassword={showPassword} onTogglePassword={togglePw} isSignup />
+              <InputField label="New Security Key" type="password" value={password} onChange={setPassword} placeholder="Enter a new password" isPassword showPassword={showPassword} onTogglePassword={togglePw} isSignup />
+              <InputField label="Confirm Security Key" type="password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Re-enter your password" isPassword showPassword={showPassword} onTogglePassword={togglePw} isSignup />
               <p className="text-[9px] text-neutral-500 font-medium px-2 leading-relaxed italic">
                 Protocol: Your new key must be at least 8 characters and differ from previous identifiers.
               </p>
@@ -300,22 +300,22 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
           )}
 
           {(view === 'login' || view === 'signup' || view === 'forgot') && (
-            <form onSubmit={view === 'forgot' ? handleForgotPassword : handleAuth} className="space-y-6">
+            <form autoComplete="off" onSubmit={view === 'forgot' ? handleForgotPassword : handleAuth} className="space-y-6">
               {view === 'signup' && (
                 <>
-                  <InputField label="Full Legal Name" type="text" value={fullName} onChange={setFullName} placeholder="Jean-Claude Gasana" />
-                  {role === 'attorney' && <InputField label="Bar ID" type="text" value={licenseId} onChange={setLicenseId} placeholder="RBA/2025/00..." />}
-                  {role === 'judge' && <InputField label="Judicial ID" type="text" value={licenseId} onChange={setLicenseId} placeholder="JUD/KGL/..." />}
+                  <InputField label="Full Legal Name" type="text" value={fullName} onChange={setFullName} placeholder="Enter your full name" />
+                  {role === 'attorney' && <InputField label="Bar ID" type="text" value={licenseId} onChange={setLicenseId} placeholder="Enter your Bar ID" />}
+                  {role === 'judge' && <InputField label="Judicial ID" type="text" value={licenseId} onChange={setLicenseId} placeholder="Enter your judicial ID" />}
                 </>
               )}
 
-              <InputField label="Email Identity" type="email" value={email} onChange={setEmail} placeholder="identity@justicehub.rw" />
+              <InputField label="Email Identity" type="email" value={email} onChange={setEmail} placeholder="Enter your email" />
 
               {view !== 'forgot' && (
                 <div className="space-y-6">
-                  <InputField label="Security Key" type="password" value={password} onChange={setPassword} placeholder="••••••••" isPassword showPassword={showPassword} onTogglePassword={togglePw} isSignup={view === 'signup'} />
+                  <InputField label="Security Key" type="password" value={password} onChange={setPassword} placeholder="Enter your password" isPassword showPassword={showPassword} onTogglePassword={togglePw} isSignup={view === 'signup'} />
                   {view === 'signup' && (
-                    <InputField label="Confirm Security Key" type="password" value={confirmPassword} onChange={setConfirmPassword} placeholder="••••••••" isPassword showPassword={showPassword} onTogglePassword={togglePw} isSignup />
+                    <InputField label="Confirm Security Key" type="password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Re-enter your password" isPassword showPassword={showPassword} onTogglePassword={togglePw} isSignup />
                   )}
                 </div>
               )}

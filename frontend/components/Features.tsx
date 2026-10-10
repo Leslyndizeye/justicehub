@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 const features = [
   {
     title: "JURISPRUDENTIAL MODELS",
-    desc: "Seamlessly analyze codified records across Kinyarwanda and French using neural models trained on the Republic's history.",
+    desc: "Ask questions in Ikinyarwanda, English, or French and review explanations alongside legal references and source links.",
     icon: "⚜"
   },
   {

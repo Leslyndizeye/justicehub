@@ -1,3 +1,5 @@
+import { chatReplyError } from './chatErrors.js';
+
 /**
  * Read JSON events from the backend's server-sent response stream.
  * @param {Response} response
@@ -28,7 +30,7 @@ export async function readChatStream(response, onEvent) {
     if (event === 'done' && (typeof payload.reply !== 'string' || typeof payload.sessionId !== 'string')) {
       throw new Error('The reply stream did not include a completed answer.');
     }
-    if (event === 'error') throw new Error(payload.error || 'The reply could not be completed.');
+    if (event === 'error') throw chatReplyError(payload);
     onEvent(event, payload);
     if (event === 'done') result = payload;
   }

@@ -44,6 +44,17 @@ test('reports a mid-stream server failure after delivering partial text', async 
   assert.deepEqual(seen, ['token']);
 });
 
+test('preserves rate-limit metadata for the composer countdown without delivering a completed reply', async () => {
+  await assert.rejects(readChatStream(response([encoder.encode(event('error', {
+    status: 429, error: 'Wait before trying again.', retryAfterSeconds: 3333,
+  }))]), () => {}), error => {
+    assert.equal(error.status, 429);
+    assert.equal(error.retryAfterSeconds, 3333);
+    assert.equal(error.message, 'Wait before trying again.');
+    return true;
+  });
+});
+
 test('does not treat an interrupted reply as successfully completed', async () => {
   await assert.rejects(readChatStream(response([encoder.encode(event('token', { text: 'Partial' }))]), () => {}), /before the reply finished/);
 });

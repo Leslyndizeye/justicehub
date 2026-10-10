@@ -20,6 +20,7 @@ export function remarkSafeBreaks() {
 }
 
 const ChatMarkdown: React.FC<{ content: string }> = ({ content }) => (
+  <div className="chat-markdown">
   <ReactMarkdown
     remarkPlugins={[remarkGfm, remarkSafeBreaks]}
     skipHtml
@@ -33,7 +34,7 @@ const ChatMarkdown: React.FC<{ content: string }> = ({ content }) => (
       ol: ({ children }) => <ol className="my-4 list-decimal space-y-2 pl-6 marker:font-medium marker:text-legal-gold">{children}</ol>,
       li: ({ children }) => <li className="pl-1 leading-[1.8] [&>p]:mb-2 [&>ul]:my-2 [&>ol]:my-2">{children}</li>,
       a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer" className="break-words text-legal-gold underline decoration-legal-gold/40 underline-offset-4 hover:decoration-legal-gold">{children}</a>,
-      table: ({ children }) => <div className="my-5 w-full overflow-x-auto rounded-xl border border-white/10"><table className="w-full border-collapse text-left text-sm">{children}</table></div>,
+      table: ({ children }) => <div className="chat-table-scroll my-5 w-full overflow-x-auto rounded-xl border border-white/10"><table className="w-full border-collapse text-left text-sm">{children}</table></div>,
       thead: ({ children }) => <thead className="bg-white/[0.06] text-white">{children}</thead>,
       tbody: ({ children }) => <tbody className="divide-y divide-white/10">{children}</tbody>,
       th: ({ children }) => <th className="min-w-[140px] px-4 py-3 align-top font-semibold">{children}</th>,
@@ -46,6 +47,7 @@ const ChatMarkdown: React.FC<{ content: string }> = ({ content }) => (
   >
     {content}
   </ReactMarkdown>
+  </div>
 );
 
 export default ChatMarkdown;

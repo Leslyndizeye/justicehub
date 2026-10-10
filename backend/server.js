@@ -2,8 +2,16 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import Groq from 'groq-sdk';
-import supabase from './supabase.js';
+import supabase from './privateSupabase.js';
 import { createChatProvider, publicChatError } from './chatProvider.js';
+import { replyLanguages, resolveReplyLanguage } from './chatLanguage.js';
+import { searchLegalDocs } from './legalRetrieval.js';
+import { configuredSearchFallback } from './searchFallback.js';
+import { chatErrorDiagnostic } from './chatDiagnostics.js';
+import { createFirebaseIdentity } from './firebaseIdentity.js';
+import { configuredMemoryStore } from './memoryStore.js';
+import { memoryRouter } from './memoryRoutes.js';
+import { apiAccess } from './apiAccess.js';
 
 const app = express();
 const allowedOrigins = process.env.FRONTEND_URL
@@ -11,38 +19,46 @@ const allowedOrigins = process.env.FRONTEND_URL
   : ['http://localhost:5173'];
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
+// Public liveness probe for the hosting platform; returns no account or database data.
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+const verifyIdentity = createFirebaseIdentity({ projectId: process.env.FIREBASE_PROJECT_ID?.trim() || 'ireme-30164' });
+app.use('/api/memory', memoryRouter({ verify: verifyIdentity, store: configuredMemoryStore() }));
+app.use('/api', apiAccess({ verify: verifyIdentity,
+  profile: async uid => {
+    const { data, error } = await supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+  ownsSession: async (id, uid) => {
+    const { data, error } = await supabase.from('chat_sessions').select('id').eq('id', id).eq('user_id', uid).maybeSingle();
+    if (error) throw error;
+    return Boolean(data);
+  },
+}));
 
 // Our provider handles one fallback explicitly; do not let SDK retries multiply rate-limited requests.
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
 const groqModel = process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-120b';
+const searchProvider = process.env.WEB_SEARCH_PROVIDER?.trim().toLowerCase() || 'tavily';
+const externalSearch = configuredSearchFallback(groq);
 const chatProvider = createChatProvider({
   client: groq,
   model: groqModel,
   fallbackModel: process.env.GROQ_FALLBACK_MODEL?.trim() || 'openai/gpt-oss-20b',
-  searchSetting: process.env.GROQ_WEB_SEARCH,
+  // Search is isolated from answer generation; only public research queries may use a browser.
+  searchSetting: 'false',
+  externalSearch,
   reasoningEffort: process.env.GROQ_REASONING_EFFORT?.trim() || 'medium',
 });
-
-// ─── RAG: search Rwanda legal documents ──────────────────────
-async function searchLegalDocs(query) {
-  try {
-    const { data } = await supabase
-      .from('legal_documents')
-      .select('title, category, content, year, source')
-      .textSearch('content', query, { type: 'websearch', config: 'english' })
-      .limit(4);
-    return data || [];
-  } catch {
-    return [];
-  }
-}
 
 // ─── USERS ───────────────────────────────────────────────────────────────────
 
 // Create or update a user profile (called after Firebase login)
 // IMPORTANT: never overwrite role for existing users — only set role on first creation
 app.post('/api/users', async (req, res) => {
-  const { uid, email, auth_provider } = req.body;
+  const uid = req.identity.uid;
+  const email = req.identity.email || req.body.email;
+  const { auth_provider } = req.body;
   if (!uid || !email) return res.status(400).json({ error: 'uid and email required' });
 
   // Check if profile already exists
@@ -203,7 +219,8 @@ app.get('/api/sessions/:uid', async (req, res) => {
 
 // Create a new session
 app.post('/api/sessions', async (req, res) => {
-  const { uid, title } = req.body;
+  const uid = req.identity.uid;
+  const { title } = req.body;
   if (!uid) return res.status(400).json({ error: 'uid required' });
 
   const { data, error } = await supabase
@@ -218,8 +235,9 @@ app.post('/api/sessions', async (req, res) => {
 
 // Delete a session and its messages
 app.delete('/api/sessions/:sessionId', async (req, res) => {
-  await supabase.from('messages').delete().eq('session_id', req.params.sessionId);
-  const { error } = await supabase.from('chat_sessions').delete().eq('id', req.params.sessionId);
+  const { error: messageError } = await supabase.from('messages').delete().eq('session_id', req.params.sessionId).eq('user_id', req.identity.uid);
+  if (messageError) return res.status(500).json({ error: 'Conversation could not be deleted.' });
+  const { error } = await supabase.from('chat_sessions').delete().eq('id', req.params.sessionId).eq('user_id', req.identity.uid);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
@@ -232,6 +250,7 @@ app.get('/api/messages/:sessionId', async (req, res) => {
     .from('messages')
     .select('*')
     .eq('session_id', req.params.sessionId)
+    .eq('user_id', req.identity.uid)
     .order('created_at', { ascending: true });
 
   if (error) return res.status(500).json({ error: error.message });
@@ -241,8 +260,12 @@ app.get('/api/messages/:sessionId', async (req, res) => {
 // ─── CHAT (main AI route) ─────────────────────────────────────────────────────
 
 app.post('/api/chat', async (req, res) => {
-  const { uid, sessionId, message, role } = req.body;
+  const uid = req.identity.uid;
+  const { sessionId, message } = req.body;
+  const role = req.accountRole;
   const streaming = req.body.stream === true;
+  const languagePreference = req.body.replyLanguage ?? 'auto';
+  if (!replyLanguages.includes(languagePreference)) return res.status(400).json({ error: 'replyLanguage must be auto, rw, en, or fr' });
   if (typeof uid !== 'string' || !uid.trim() || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ error: 'uid and a nonempty message are required' });
   }
@@ -253,6 +276,8 @@ app.post('/api/chat', async (req, res) => {
   let activeSessionId = sessionId;
   let replySaved = false;
   let heartbeat;
+  let replyLanguage = resolveReplyLanguage(message, [], languagePreference);
+  let chatStage = 'create_session';
   const onDisconnect = () => { if (!complete) generation.abort(); };
   res.on('close', onDisconnect);
   const sendEvent = (event, data) => {
@@ -270,6 +295,7 @@ app.post('/api/chat', async (req, res) => {
       if (sessionErr) throw sessionErr;
       activeSessionId = session.id;
     } else {
+      chatStage = 'load_session';
       const { data: session, error: sessionErr } = await supabase
         .from('chat_sessions')
         .select('id')
@@ -281,6 +307,7 @@ app.post('/api/chat', async (req, res) => {
     }
 
     // Load recent saved turns before inserting the current message.
+    chatStage = 'load_history';
     const { data: recentMessages, error: historyErr } = await supabase
       .from('messages')
       .select('content, sender')
@@ -290,8 +317,10 @@ app.post('/api/chat', async (req, res) => {
       .limit(20);
     if (historyErr) throw historyErr;
     const history = (recentMessages || []).reverse();
+    replyLanguage = resolveReplyLanguage(message, history, languagePreference);
 
     // 2. Save user message to Supabase
+    chatStage = 'save_user';
     const { error: userMessageErr } = await supabase.from('messages').insert({
       session_id: activeSessionId,
       user_id: uid,
@@ -301,7 +330,8 @@ app.post('/api/chat', async (req, res) => {
     if (userMessageErr) throw userMessageErr;
 
     // Build conversational instructions and grounded reference context.
-    const legalDocs = await searchLegalDocs(message);
+    chatStage = 'legal_retrieval';
+    const legalDocs = await searchLegalDocs(supabase, message, history);
 
     // Stream actual model tokens to the UI. JSON callers retain the existing API.
     if (streaming) {
@@ -309,13 +339,14 @@ app.post('/api/chat', async (req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
-      sendEvent('session', { sessionId: activeSessionId });
+      sendEvent('session', { sessionId: activeSessionId, replyLanguage });
       heartbeat = setInterval(() => {
         if (!res.destroyed && !res.writableEnded) res.write(': keepalive\n\n');
       }, 15000);
     }
+    chatStage = 'generate';
     const aiText = await chatProvider.reply({
-      message, role, history, legalDocs, streaming, signal: generation.signal,
+      message, role, history, legalDocs, replyLanguage, streaming, signal: generation.signal,
       onEvent: (event, data) => {
         if (event === 'token') streamedReply += data.text;
         if (streaming) sendEvent(event, data);
@@ -323,6 +354,7 @@ app.post('/api/chat', async (req, res) => {
     });
 
     // 5. Save AI response to Supabase
+    chatStage = 'save_reply';
     const { error: aiMessageErr } = await supabase.from('messages').insert({
       session_id: activeSessionId,
       user_id: uid,
@@ -333,6 +365,7 @@ app.post('/api/chat', async (req, res) => {
     replySaved = true;
 
     // 6. Update session title if it's the first message
+    chatStage = 'update_session';
     await supabase
       .from('chat_sessions')
       .update({ updated_at: new Date().toISOString() })
@@ -359,8 +392,9 @@ app.post('/api/chat', async (req, res) => {
       }
       return;
     }
-    const publicError = publicChatError(err);
-    console.error('Chat error:', err?.status || 'internal', err?.error?.error?.code || err?.error?.code || err?.code || 'request_failed');
+    const publicError = publicChatError(err, replyLanguage);
+    console.error('Chat error:', chatErrorDiagnostic(err, chatStage),
+      ...(publicError.status === 429 ? [{ retryAfterSeconds: publicError.retryAfterSeconds, models: err?.rateLimits || [] }] : []));
     if (res.headersSent) {
       sendEvent('error', publicError);
       res.end();
@@ -377,4 +411,9 @@ app.post('/api/chat', async (req, res) => {
 // ─── START ────────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`JusticeHub backend running on http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`JusticeHub backend running on http://localhost:${PORT}`);
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) console.warn('Database memory is not configured: SUPABASE_SERVICE_ROLE_KEY is missing. Browser memory still works.');
+  console.log(`Web search: ${searchProvider}; Groq search fallback ${searchProvider === 'tavily' && process.env.GROQ_SEARCH_FALLBACK?.trim().toLowerCase() === 'true' ? 'enabled' : 'disabled'}`);
+  if (searchProvider === 'tavily' && !process.env.TAVILY_API_KEY?.trim()) console.warn('TAVILY_API_KEY is missing. Tavily search is unavailable; configured search fallback may still run.');
+});

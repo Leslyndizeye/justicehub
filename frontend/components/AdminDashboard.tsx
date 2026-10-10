@@ -1,3 +1,4 @@
+import { firebaseFetch } from "../lib/firebaseFetch";
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { auth } from './firebaseConfig';
 import { signOut } from 'firebase/auth';
@@ -12,7 +13,8 @@ import {
   ArrowUpRight, ChevronDown, Database, BookOpen, MessagesSquare,
 } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+import { apiBaseUrl } from '../lib/apiBase.js';
+const API = apiBaseUrl(import.meta.env.VITE_API_URL, import.meta.env.DEV);
 const GOLD = '#C5A059';
 
 type Tab = 'overview' | 'users' | 'consultations' | 'chats' | 'legal-db';
@@ -172,11 +174,11 @@ const AdminDashboard: React.FC = () => {
 
   const fetchAll = useCallback(async () => {
     const [s, u, se, ch, d] = await Promise.all([
-      fetch(`${API}/api/admin/stats`).then(r => r.json()),
-      fetch(`${API}/api/admin/users`).then(r => r.json()),
-      fetch(`${API}/api/admin/sessions`).then(r => r.json()),
-      fetch(`${API}/api/admin/messages`).then(r => r.json()),
-      fetch(`${API}/api/admin/documents`).then(r => r.json()),
+      firebaseFetch(`${API}/api/admin/stats`).then(r => r.json()),
+      firebaseFetch(`${API}/api/admin/users`).then(r => r.json()),
+      firebaseFetch(`${API}/api/admin/sessions`).then(r => r.json()),
+      firebaseFetch(`${API}/api/admin/messages`).then(r => r.json()),
+      firebaseFetch(`${API}/api/admin/documents`).then(r => r.json()),
     ]);
     setStats(s);
     setUsers(Array.isArray(u) ? u : []);
@@ -191,7 +193,7 @@ const AdminDashboard: React.FC = () => {
 
   const changeRole = async (uid: string, role: string) => {
     setUpdatingRole(uid);
-    await fetch(`${API}/api/users/${uid}/role`, {
+    await firebaseFetch(`${API}/api/users/${uid}/role`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role }),
     });
@@ -200,14 +202,14 @@ const AdminDashboard: React.FC = () => {
   };
 
   const deleteUser = async (uid: string) => {
-    await fetch(`${API}/api/admin/users/${uid}`, { method: 'DELETE' });
+    await firebaseFetch(`${API}/api/admin/users/${uid}`, { method: 'DELETE' });
     setUsers(p => p.filter(u => u.id !== uid));
     setStats(p => ({ ...p, totalUsers: p.totalUsers - 1 }));
     setConfirm(null);
   };
 
   const deleteDoc = async (id: number) => {
-    await fetch(`${API}/api/admin/documents/${id}`, { method: 'DELETE' });
+    await firebaseFetch(`${API}/api/admin/documents/${id}`, { method: 'DELETE' });
     setDocs(p => p.filter(d => d.id !== id));
     setStats(p => ({ ...p, totalDocuments: p.totalDocuments - 1 }));
     setConfirm(null);

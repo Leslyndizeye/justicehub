@@ -1,3 +1,4 @@
+import { firebaseFetch } from "./lib/firebaseFetch";
 import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
@@ -16,8 +17,12 @@ import Dashboard from './components/dashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { auth } from './components/firebaseConfig';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import { dashboardRoute, signInDestination } from './lib/chatSessions.js';
+import { apiBaseUrl } from './lib/apiBase.js';
+import StatusScreen from './components/StatusScreen';
+import { recoveryState, requestError } from './lib/recoveryState.js';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API = apiBaseUrl(import.meta.env.VITE_API_URL, import.meta.env.DEV);
 
 export const ThemeContext = React.createContext({ isDark: true, toggleTheme: () => {} });
 
@@ -89,10 +94,11 @@ const App: React.FC = () => {
   const resolveRole = async (u: User): Promise<string> => {
     try {
       const provider = u.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'password';
-      const res = await fetch(`${API}/api/users`, {
+      const res = await firebaseFetch(`${API}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: u.uid, email: u.email, auth_provider: provider }),
+        signal: AbortSignal.timeout(10000),
       });
       const data = await res.json();
       return data.role ?? 'citizen';
@@ -116,10 +122,6 @@ const App: React.FC = () => {
         const r = await resolveRole(u);
         setRole(r);
         setRoleLoading(false);
-        // Redirect from /auth after login
-        if (location.pathname === '/auth') {
-          navigate(r === 'admin' ? '/adminxt' : '/dashboard', { replace: true });
-        }
       } else {
         setRole(null);
         setRoleLoading(false);
@@ -147,10 +149,11 @@ const App: React.FC = () => {
   const showIntro = !isIntroFinished && location.pathname === '/';
   // Wait for both Firebase auth AND role fetch to complete before rendering routes
   const isReady = user !== 'loading' && !roleLoading;
+  const isChatPage = /^\/dashboard(?:\/|$)/.test(location.pathname);
 
   return (
     <ThemeContext.Provider value={{ isDark, toggleTheme }}>
-      <div className="relative min-h-screen w-full bg-neutral-100 dark:bg-[#05070A] selection:bg-legal-gold/30">
+      <div className={`relative w-full selection:bg-legal-gold/30 ${isChatPage ? 'chat-page-shell' : 'min-h-screen bg-neutral-100 dark:bg-[#05070A]'}`}>
         {showIntro && <IntroSequence onFinish={() => setIsIntroFinished(true)} />}
 
         <div className={`transition-opacity duration-300 ${(!showIntro && isReady) ? 'opacity-100' : 'opacity-0'}`}>
@@ -161,7 +164,7 @@ const App: React.FC = () => {
               {/* Auth page */}
               <Route path="/auth" element={
                 user
-                  ? <Navigate to={role === 'admin' ? '/adminxt' : '/dashboard'} replace />
+                  ? <Navigate to={signInDestination(role, (location.state as any)?.returnTo)} replace />
                   : <AuthPage
                       onBack={() => navigate('/')}
                       initialMode={(location.state as any)?.mode}
@@ -170,12 +173,12 @@ const App: React.FC = () => {
               } />
 
               {/* Regular dashboard — redirect to adminxt if admin */}
-              <Route path="/dashboard" element={
+              <Route path={dashboardRoute} element={
                 !user
-                  ? <Navigate to="/auth" replace />
+                  ? <Navigate to="/auth" state={{ returnTo: location.pathname }} replace />
                   : role === 'admin'
                   ? <Navigate to="/adminxt" replace />
-                  : <Dashboard />
+                  : <Dashboard key={user.uid} user={user} role={role || 'citizen'} />
               } />
 
               {/* Admin panel — redirect to dashboard if not admin */}
@@ -183,7 +186,7 @@ const App: React.FC = () => {
                 !user
                   ? <Navigate to="/auth" replace />
                   : role !== 'admin'
-                  ? <Navigate to="/dashboard" replace />
+                  ? <StatusScreen state={recoveryState(requestError(403))} workspaceHref="/dashboard" />
                   : <AdminDashboard />
               } />
 
@@ -192,7 +195,7 @@ const App: React.FC = () => {
               <Route path="/method"       element={<Navigate to="/#process"      replace />} />
               <Route path="/pricing"      element={<Navigate to="/#pricing"      replace />} />
               <Route path="/testimonials" element={<Navigate to="/#testimonials" replace />} />
-              <Route path="*"             element={<Navigate to="/"              replace />} />
+              <Route path="*" element={<StatusScreen state={recoveryState(requestError(404))} workspaceHref={user ? role === 'admin' ? '/adminxt' : '/dashboard' : undefined} />} />
             </Routes>
           )}
         </div>

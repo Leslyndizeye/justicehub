@@ -7,7 +7,7 @@ const faqs = [
   },
   {
     q: "Does the AI support 'Amategeko' terminology in legal Kinyarwanda?",
-    a: "Yes. Our models are trained specifically on the Journal Officiel (Official Gazette) and judicial records, capturing the high-level linguistic nuances of Rwandan legislative Kinyarwanda."
+    a: "You can ask questions and choose Ikinyarwanda as the reply language. JusticeHub uses a multilingual model with legal reference documents and web search. Important legal terms and conclusions should be checked against the official text."
   },
   {
     q: "Is JusticeHub an official partner of the Rwanda Law Reform Commission (RLRC)?",
