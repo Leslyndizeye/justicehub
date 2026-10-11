@@ -14,7 +14,7 @@ function setup(fetchImpl=async()=>response()) {
     load(){}
     removeAttribute(){this.src='';}
   }
-  const reader=createAnswerReader({base:'https://backend.example',AudioClass:Audio,
+  const reader=createAnswerReader({base:'https://backend.example',AudioClass:Audio,AudioContextClass:null,
     urls:{createObjectURL:()=>`blob:${++allocated}`,revokeObjectURL:url=>revoked.push(url)},
     fetchImpl:(url,options)=>{requests.push({url,options});return fetchImpl(url,options);},
     deviceReader:createSpeechReader({synthesis:null}),
@@ -30,7 +30,7 @@ test('natural audio requires an explicit choice and sends only the selected answ
   await d.reader.start({messageId:'a',text:'Do not change RWF 100000 or 30 days.',language:'en'});
   assert.equal(d.requests.length,1);
   assert.equal(d.requests[0].url,'https://backend.example/api/speech');
-  assert.deepEqual(JSON.parse(d.requests[0].options.body),{text:'Do not change RWF 100000 or 30 days.',voice:'Sulafat',language:'en',consent:true});
+  assert.deepEqual(JSON.parse(d.requests[0].options.body),{text:'Do not change RWF 100000 or 30 days.',voice:'Algieba',language:'en',consent:true});
   assert.equal(d.reader.snapshot().status,'reading');
   await d.players[0].onended();
   assert.equal(d.reader.snapshot().status,'idle');
