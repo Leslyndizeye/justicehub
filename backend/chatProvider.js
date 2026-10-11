@@ -9,6 +9,7 @@ import { conversationCorrection } from './chatCorrection.js';
 import { casualReply } from '../shared/chatCasual.js';
 import { externalSearchNotice, finishExternalReply } from './externalSearch.js';
 import { providerFailure } from './chatDiagnostics.js';
+import { finishLawReply } from './lawSources.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -214,7 +215,9 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
             if (text.trim() && showLookupNotice) text = lookupNotice + text;
             const helpfulText = constructiveReply(text, copy);
             if (streaming && helpfulText !== text) onEvent('token', { text: helpfulText.slice(text.trim().length) });
-            const reply = externalSearch ? finishExternalReply(helpfulText, externalSearchResult, language) : search.finish(helpfulText);
+            const researchReply = externalSearch ? finishExternalReply(helpfulText, externalSearchResult, language) : search.finish(helpfulText);
+            const reply = finishLawReply(researchReply, boundedContext([], legalDocs).legalDocs, language);
+            if (streaming && reply !== researchReply) onEvent('token', {text:reply.slice(researchReply.length)});
             if (!reply) throw Object.assign(new Error('The AI returned an empty answer'), { code: 'empty_model_response' });
             if (externalSearchResult?.sources?.length) onEvent('status', { text: '', webSearch: true });
             cooldowns.delete(candidate);

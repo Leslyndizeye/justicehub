@@ -335,7 +335,7 @@ app.post('/api/chat', async (req, res) => {
 
     // Build conversational instructions and grounded reference context.
     chatStage = 'legal_retrieval';
-    const legalDocs = await searchLegalDocs(supabase, message, history);
+    const legalDocs = await searchLegalDocs(supabase, message, history, replyLanguage);
 
     // Stream actual model tokens to the UI. JSON callers retain the existing API.
     if (streaming) {

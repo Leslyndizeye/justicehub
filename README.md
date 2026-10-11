@@ -117,6 +117,30 @@ Legal document data is in `backend/seed_*.sql`. Check which files have already b
 
 Firestore rules and a complete Supabase schema export are not included in this repository.
 
+### Imported law PDFs
+
+The supplied `Amategeko.zip` contains 16 PDFs, including four in its nested `Legal Instrument.zip`. The import uses the existing `legal_documents` table and a public `justicehub-legal-sources` storage bucket. Original PDFs are stored once by their SHA-256 checksum; excerpt IDs are deterministic. Law numbers and versions are checked against existing citations before insertion. Amendments and newer versions are distinct documents. Existing excerpts are preserved and receive a source PDF link where the same law version is identified.
+
+The completed import on 11 October 2026 added 2,902 passages from ten missing versions, linked 42 existing excerpts for six represented versions, and archived all 16 original PDFs. A second applied import inserted nothing and uploaded nothing. All archived downloads matched the original checksums. Details and source links are in [the import report](backend/data/amategeko-import-report.md).
+
+The checked-in [text corpus](backend/data/amategeko.json) preserves page and language metadata. The advocates' fees PDF had an unreadable text layer; its English passages were recovered with local Windows OCR and are marked for checking against the PDF, especially for amounts and conditions. Native text extraction retained the Ikinyarwanda, English, and French columns for the other PDFs. Extraction is not a legal review or a guarantee that these published versions reflect all later amendments.
+
+From `backend/`, preview the import without writes:
+
+```bash
+npm run import:laws
+```
+
+To apply or resume it, extract the original ZIP and its nested ZIP into a directory, then supply that directory:
+
+```bash
+npm run import:laws -- --apply --pdf-dir "C:/path/to/extracted/Amategeko"
+```
+
+The importer requires backend-only `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL`. It validates PDF checksums before uploading, never deletes existing laws, and refuses to overwrite independently changed excerpts. Keep the service key out of the frontend. Preview does not create tables or upload files. Applying the import creates its dedicated public PDF bucket if missing; it does not change another bucket's privacy settings.
+
+Chat retrieves relevant passages, prioritizes provisions over contents pages, uses the requested answer language, and supplies these excerpts to the existing Groq model for explanation. When the model omits an imported PDF citation, a reference list includes that PDF once, with the supplied page numbers. These are dated references, not successful live verification of current law. No separate embedding API, translation provider, or paid OCR service was added.
+
 ## Run locally
 
 Open two terminals from the project root.
@@ -156,6 +180,7 @@ If PowerShell blocks `npm.ps1`, use `npm.cmd` instead of `npm`. Both folders use
 | `backend` | `npm run dev` | Starts the API with automatic restart when source files change. |
 | `backend` | `npm start` | Starts the API without automatic restart. |
 | `backend` | `npm test` | Checks search configuration, source links, and conversation instructions without external API calls. |
+| `backend` | `npm run import:laws` | Previews missing law passages and source links; `-- --apply --pdf-dir <directory>` imports verified original PDFs and missing passages. |
 | `backend` | `npm run eval:chat -- client_defence` | Runs an opt-in live check of client-case understanding using Groq. Uses API tokens; does not write to the database. |
 
 The backend requires `SUPABASE_SERVICE_ROLE_KEY` for protected API access; startup fails when it is missing instead of using an anonymous key. The backend needs no compilation step. Its `build` script currently only prints a message.
