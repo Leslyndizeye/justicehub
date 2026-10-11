@@ -12,4 +12,6 @@ ALTER TABLE public.user_memories ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.user_memories FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.user_memories TO service_role;
 COMMENT ON TABLE public.user_memories IS 'Private selective memories. Access only through the API after Firebase token verification; owner_id is taken from verified token sub, never a caller-provided UID.';
+-- Make the table visible to the Data API after this transaction commits.
+NOTIFY pgrst, 'reload schema';
 COMMIT;

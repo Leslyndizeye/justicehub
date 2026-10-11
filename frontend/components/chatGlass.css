@@ -132,6 +132,12 @@
 .chat-message-action.is-reading { color: var(--chat-accent); background: rgba(var(--chat-accent-rgb), .1); }
 .chat-message-action:disabled { opacity: .45; }
 .chat-speech-notice { flex-basis: 100%; margin: 3px 8px; color: var(--chat-muted); font-size: 11px; line-height: 1.6; }
+.chat-speech-options-row { flex-basis: 100%; min-width: 0; }
+.chat-speech-options { width: 100%; max-width: 460px; margin: 5px 0; padding: 14px; border: 1px solid rgba(var(--chat-accent-rgb), .24); border-radius: 14px; background: #161616; color: var(--chat-muted); font-size: 12px; line-height: 1.6; }
+.chat-speech-voice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: #eee; }
+.chat-speech-voice select { min-height: 36px; padding: 6px 10px; border: 1px solid #444; border-radius: 8px; color: #eee; background: #242424; }
+.chat-speech-options p { margin: 10px 0; }
+.chat-speech-option-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .chat-scroll-end { height: 20px; }
 .chat-composer-area { flex-shrink: 0; padding: 20px 24px max(24px, env(safe-area-inset-bottom)); background: linear-gradient(0deg, rgba(4, 4, 4, .86), rgba(4, 4, 4, .1)); }
 .chat-composer { position: relative; max-width: 768px; margin: 0 auto; border-radius: 26px; border: 1px solid rgba(255, 255, 255, .18); background: linear-gradient(170deg, rgba(255, 255, 255, .055), transparent 55%), rgba(38, 38, 38, .58); box-shadow: 0 7px 24px rgba(0, 0, 0, .12), inset 0 1px 0 rgba(255, 255, 255, .12); transition: box-shadow .18s, border-color .18s; }
@@ -190,7 +196,7 @@
   .chat-session:hover .chat-session-delete, .chat-session:focus-within .chat-session-delete { opacity: 1; }
   .chat-message-actions { opacity: 0; transition: opacity .18s; }
   .chat-message-shell:hover .chat-message-actions, .chat-message-shell:focus-within .chat-message-actions { opacity: 1; }
-  .chat-message-actions:has(.is-reading), .chat-message-actions:has(.chat-speech-notice) { opacity: 1; }
+  .chat-message-actions:has(.is-reading), .chat-message-actions:has(.chat-speech-notice), .chat-message-actions:has(.chat-speech-options) { opacity: 1; }
 }
 @media (max-width: 1199px) {
   .justice-chat { padding: 0; gap: 0; }

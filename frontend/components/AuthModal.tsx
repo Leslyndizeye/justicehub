@@ -8,6 +8,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { auth, googleProvider } from './firebaseConfig';
+import { authErrorMessage } from '../lib/authErrors.js';
 
 type UserRole = 'attorney' | 'judge' | 'citizen' | null;
 type AuthView = 'login' | 'signup' | 'forgot' | 'verify' | 'role';
@@ -88,6 +89,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
     e.preventDefault();
     if (loading) return;
     resetMessages();
+    if (view === 'signup' && password !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter them.');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -95,15 +100,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
         await signInWithEmailAndPassword(auth, email, password);
         onClose();
       } else if (view === 'signup') {
-        if (password !== confirmPassword) throw new Error("Passwords do not match.");
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName: fullName });
         await sendEmailVerification(userCredential.user);
         setView('verify');
       }
     } catch (err: any) {
-      console.error(err);
-      setError(err.message.includes('auth/invalid-credential') ? 'Authentication failed. Please check your credentials.' : err.message);
+      if (import.meta.env.DEV) console.error('Account request failed:', err);
+      setError(authErrorMessage(err, view));
     } finally {
       setLoading(false);
     }
@@ -117,7 +121,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
       await signInWithPopup(auth, googleProvider);
       onClose();
     } catch (err: any) {
-      setError(err.message);
+      if (import.meta.env.DEV) console.error('Sign-in failed:', err);
+      setError(authErrorMessage(err, 'google'));
     } finally {
       setLoading(false);
     }
@@ -133,9 +138,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
     resetMessages();
     try {
       await sendPasswordResetEmail(auth, email);
-      setSuccess('Success: A reset protocol has been dispatched to your inbox.');
+      setSuccess('If an account uses this email, you will receive a reset link. Check your inbox and spam folder.');
     } catch (err: any) {
-      setError(err.message.includes('user-not-found') ? 'Email address not recognized in the sovereign database.' : err.message);
+      if (import.meta.env.DEV) console.error('Password reset request failed:', err);
+      setError(authErrorMessage(err, 'forgot'));
     } finally {
       setLoading(false);
     }

@@ -26,6 +26,12 @@ services:
         value: ireme-30164
       - key: GROQ_API_KEY
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_SPEECH_FREE_TIER
+        value: "false"
+      - key: GEMINI_SPEECH_DAILY_LIMIT
+        value: "30"
       - key: GROQ_MODEL
         value: openai/gpt-oss-120b
       - key: GROQ_FALLBACK_MODEL

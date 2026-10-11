@@ -12,11 +12,12 @@ import { createFirebaseIdentity } from './firebaseIdentity.js';
 import { configuredMemoryStore } from './memoryStore.js';
 import { memoryRouter } from './memoryRoutes.js';
 import { apiAccess } from './apiAccess.js';
+import { configuredCorsOrigins } from './corsConfig.js';
+import { configuredSpeechProvider } from './speechProvider.js';
+import { speechRouter } from './speechRoutes.js';
 
 const app = express();
-const allowedOrigins = process.env.FRONTEND_URL
-  ? [process.env.FRONTEND_URL, 'http://localhost:5173']
-  : ['http://localhost:5173'];
+const allowedOrigins = configuredCorsOrigins(process.env.FRONTEND_URL);
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 // Public liveness probe for the hosting platform; returns no account or database data.
@@ -35,6 +36,9 @@ app.use('/api', apiAccess({ verify: verifyIdentity,
     return Boolean(data);
   },
 }));
+
+const speechProvider = configuredSpeechProvider();
+app.use('/api/speech', speechRouter({ provider: speechProvider }));
 
 // Our provider handles one fallback explicitly; do not let SDK retries multiply rate-limited requests.
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
@@ -413,6 +417,9 @@ app.post('/api/chat', async (req, res) => {
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`JusticeHub backend running on http://localhost:${PORT}`);
+  console.log(`Allowed frontend origins: ${allowedOrigins.join(', ')}`);
+  console.log(`Natural speech: ${speechProvider.available ? 'Gemini Flash-Lite TTS; use an unbilled Free-tier project' : 'not configured; device speech remains available'}`);
+  if (process.env.NODE_ENV === 'production' && !process.env.FRONTEND_URL?.trim()) console.warn('FRONTEND_URL is missing. Set it to the deployed frontend URL to allow browser API requests.');
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) console.warn('Database memory is not configured: SUPABASE_SERVICE_ROLE_KEY is missing. Browser memory still works.');
   console.log(`Web search: ${searchProvider}; Groq search fallback ${searchProvider === 'tavily' && process.env.GROQ_SEARCH_FALLBACK?.trim().toLowerCase() === 'true' ? 'enabled' : 'disabled'}`);
   if (searchProvider === 'tavily' && !process.env.TAVILY_API_KEY?.trim()) console.warn('TAVILY_API_KEY is missing. Tavily search is unavailable; configured search fallback may still run.');

@@ -13,7 +13,7 @@ import { apiBaseUrl } from '../lib/apiBase.js';
 import { createAccountMemory, initialAccountMemory } from '../lib/accountMemory.js';
 import { Scale, Plus, MessageSquare, Menu, X, ArrowUp, CloudRain, LogOut } from 'lucide-react';
 import './chatGlass.css';
-import { createSpeechReader } from '../lib/speechReader.js';
+import { createAnswerReader } from '../lib/answerReader.js';
 import ReadAloudButton from './ReadAloudButton';
 import { StatusPanel } from './StatusScreen';
 import { recoveryState, requestError } from '../lib/recoveryState.js';
@@ -48,7 +48,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
   const { sessionId } = useParams();
   const activeSessionId = sessionId || null;
   const fetch = useMemo(() => createAuthenticatedFetch({ getUser: () => user }), [user]);
-  const speechReader = useMemo(() => createSpeechReader(), []);
+  const speechReader = useMemo(() => createAnswerReader({ base: API, fetchImpl: fetch }), [fetch]);
   useEffect(() => { speechReader.stop(); }, [speechReader, activeSessionId]);
   useEffect(() => () => speechReader.dispose(), [speechReader]);
   const [loading, setLoading] = useState(true);
@@ -607,7 +607,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
   );
 };
 
-const MessageBubble: React.FC<{ message: Message; reader: ReturnType<typeof createSpeechReader>; onEdit: (text: string) => void; onReveal: () => void }> = ({ message: m, reader, onEdit, onReveal }) => {
+const MessageBubble: React.FC<{ message: Message; reader: ReturnType<typeof createAnswerReader>; onEdit: (text: string) => void; onReveal: () => void }> = ({ message: m, reader, onEdit, onReveal }) => {
   const [copied, setCopied] = useState(false);
   const contentElement = useRef<HTMLDivElement>(null);
   const visible = useProgressiveText(m.content, Boolean(m.animate));

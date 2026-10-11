@@ -12,6 +12,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, googleProvider, db } from './firebaseConfig';
+import { authErrorMessage } from '../lib/authErrors.js';
 
 type UserRole = 'attorney' | 'judge' | 'citizen' | null;
 type AuthView = 'login' | 'signup' | 'forgot' | 'verify' | 'role' | 'confirmReset';
@@ -94,8 +95,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
           setEmail(emailAddress); // Show user which email they are resetting for
         })
         .catch((err) => {
-          console.error("Verification error:", err);
-          setError('This security link has expired or is invalid. Please request a new one.');
+          if (import.meta.env.DEV) console.error('Reset link check failed:', err);
+          setError(authErrorMessage(err, 'resetLink'));
         });
     }
   }, [oobCode, initialMode]);
@@ -104,15 +105,20 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
     e.preventDefault();
     if (loading) return;
     resetMessages();
+    if (view === 'signup' && password !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter them.');
+      return;
+    }
+    if (view === 'signup' && password.length < 8) {
+      setError('Your password must have at least 8 characters.');
+      return;
+    }
     setLoading(true);
 
     try {
       if (view === 'login') {
         await signInWithEmailAndPassword(auth, email, password);
       } else if (view === 'signup') {
-        if (password !== confirmPassword) throw new Error("Security keys do not match.");
-        if (password.length < 8) throw new Error("Security key must be at least 8 characters for sovereign compliance.");
-        
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
         // Update Firebase profile
@@ -133,13 +139,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
         setView('verify');
       }
     } catch (err: any) {
-      console.error("Auth Error:", err);
-      const msg = err.code === 'auth/invalid-credential' 
-        ? 'Invalid identity or security key.' 
-        : err.code === 'auth/email-already-in-use'
-        ? 'This identity protocol is already registered.'
-        : err.message;
-      setError(msg);
+      if (import.meta.env.DEV) console.error('Account request failed:', err);
+      setError(authErrorMessage(err, view));
     } finally {
       setLoading(false);
     }
@@ -151,22 +152,22 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
     resetMessages();
 
     if (password !== confirmPassword) {
-      setError("Security keys do not match. Please re-enter.");
+      setError('Passwords do not match. Please re-enter them.');
       return;
     }
     if (password.length < 8) {
-      setError("Security key must be at least 8 characters for sovereign compliance.");
+      setError('Your password must have at least 8 characters.');
       return;
     }
 
     setLoading(true);
     try {
       await confirmPasswordReset(auth, oobCode, password);
-      setSuccess('Identity secured. Your password has been updated successfully.');
+      setSuccess('Your password has been updated. You can now sign in.');
       setTimeout(() => setView('login'), 3000);
     } catch (err: any) {
-      console.error("Reset confirm error:", err);
-      setError(err.message || 'Failed to update security credentials.');
+      if (import.meta.env.DEV) console.error('Password update failed:', err);
+      setError(authErrorMessage(err, 'confirmReset'));
     } finally {
       setLoading(false);
     }
@@ -175,17 +176,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
-      setError('Please provide your identity email.');
+      setError('Enter your email address.');
       return;
     }
     setLoading(true);
     resetMessages();
     try {
       await sendPasswordResetEmail(auth, email);
-      setSuccess('Reset link dispatched. Please check your inbox and authorized domains.');
+      setSuccess('If an account uses this email, you will receive a reset link. Check your inbox and spam folder.');
     } catch (err: any) {
-      console.error("Reset Error:", err);
-      setError(err.code === 'auth/user-not-found' ? 'No authorized account found with this email.' : err.message);
+      if (import.meta.env.DEV) console.error('Password reset request failed:', err);
+      setError(authErrorMessage(err, 'forgot'));
     } finally {
       setLoading(false);
     }
@@ -208,7 +209,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
       }, { merge: true });
 
     } catch (err: any) {
-      setError(err.message);
+      if (import.meta.env.DEV) console.error('Sign-in failed:', err);
+      setError(authErrorMessage(err, 'google'));
     } finally {
       setLoading(false);
     }
@@ -248,7 +250,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-legal-gold/5 blur-[80px] rounded-full pointer-events-none"></div>
 
           {(error || success) && (
-            <div className={`p-5 text-[11px] font-black rounded-2xl mb-8 text-center uppercase tracking-widest border animate-fade-in-up transition-all duration-700 ${success ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+            <div role={success ? 'status' : 'alert'} className={`p-5 text-[11px] font-black rounded-2xl mb-8 text-center uppercase tracking-widest border animate-fade-in-up transition-all duration-700 ${success ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
               <div className="flex flex-col items-center gap-3">
                 {success && <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500">✓</div>}
                 {success || error}
