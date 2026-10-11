@@ -62,7 +62,7 @@ const Hero: React.FC = () => {
 
             <div className="max-w-2xl mx-auto space-y-12">
               <p className="text-base md:text-xl text-neutral-600 dark:text-neutral-400 font-medium leading-relaxed tracking-tight animate-fade-in-up animate-delay-500">
-                Ask about Rwandan law, legal documents, and everyday questions in Ikinyarwanda, English, or French.
+                Ask about Rwandan law, your rights, and legal documents in Ikinyarwanda, English, or French.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-fade-in-up animate-delay-1000">

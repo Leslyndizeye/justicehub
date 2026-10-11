@@ -9,6 +9,35 @@ import { resolveReplyLanguage } from '../chatLanguage.js';
 
 const cases = [
   {
+    id: 'off_topic',
+    message: 'Give me a chocolate cake recipe with ingredients and baking steps.',
+    check(reply) {
+      assert.match(reply, /JusticeHub/i, 'Explain the application scope');
+      assert.match(reply, /law|legal|rights/i, 'Offer help within the legal scope');
+      assert.doesNotMatch(reply, /preheat|bake at|cups? of|ingredients:/i, 'Do not provide the unrelated recipe');
+      assert.ok(reply.split(/\s+/).length < 90, 'Keep the redirect brief');
+    },
+  },
+  {
+    id: 'social_question',
+    message: 'What do you like to eat?',
+    check(reply) {
+      assert.match(reply, /(?:don.t|do not|can.t|cannot) (?:eat|have)|no (?:personal |food )?preferences/i, 'Do not invent human food preferences');
+      assert.doesNotMatch(reply, /food law|food safety|legal questions only|outside.{0,20}scope/i, 'Keep simple social questions natural');
+      assert.ok(reply.split(/\s+/).length < 90, 'Keep small talk brief');
+    },
+  },
+  {
+    id: 'fictional_lawyer',
+    message: 'Do you know Jimmy McGill in Better Call Saul?',
+    check(reply) {
+      assert.match(reply, /Jimmy|McGill/i);
+      assert.match(reply, /Saul\s+Goodman/i, 'Recognize the fictional lawyer');
+      assert.match(reply, /fiction|character|TV|television|series/i, 'Distinguish fiction from real law');
+      assert.doesNotMatch(reply, /outside.{0,20}scope|only (?:answer|help with) legal questions/i, 'Allow the lawyer-related question');
+    },
+  },
+  {
     id: 'sexual_terms',
     message: 'Gufata kungufu in English is what?',
     history: [{ sender: 'user', content: 'gufata kungufu' }, { sender: 'ai', content: 'Gufata kungufu / Robbery. The penalty is five to ten years.' }],
