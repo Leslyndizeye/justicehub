@@ -16,13 +16,13 @@ export default function ReadAloudButton({ reader, messageId, language, disabled,
   useEffect(() => () => reader.stop(messageId), [reader, messageId]);
   const ownState = state.messageId === messageId;
   const active = ownState && ['loading', 'reading', 'paused'].includes(state.status);
-  const loading = ownState && state.status === 'loading';
   const paused = ownState && state.status === 'paused';
   const error = ownState ? state.error : '';
   return <>
     <button type="button" className={`chat-message-action ${active ? 'is-reading' : ''}`}
       aria-label={paused ? 'Play prepared audio' : active ? 'Stop reading aloud' : 'Read answer aloud'} aria-pressed={active}
-      disabled={disabled || !reader.supported} title="Read this answer aloud"
+      disabled={disabled || !reader.supported}
+      title={paused ? 'Play audio' : active ? 'Stop reading aloud' : 'Read answer aloud'}
       onClick={() => {
         if (paused) { void reader.resume(messageId); return; }
         if (active) { reader.stop(messageId); return; }
@@ -30,10 +30,8 @@ export default function ReadAloudButton({ reader, messageId, language, disabled,
         if (voice === 'Algieba') reader.allowNaturalVoice();
         void reader.start({ messageId, text: getText(), language, voice });
       }}>
-      {active && !paused ? <Square size={13} aria-hidden="true" /> : <Volume2 size={14} aria-hidden="true" />}
-      {paused ? 'Play audio' : loading ? 'Stop preparing' : active ? 'Stop reading' : 'Read aloud'}
+      {active && !paused ? <Square size={14} aria-hidden="true" /> : <Volume2 size={14} aria-hidden="true" />}
     </button>
     {error && <span role="status" className="chat-speech-notice">{error}</span>}
-    {loading && <span role="status" className="chat-speech-notice">Preparing smooth speech…</span>}
   </>;
 }

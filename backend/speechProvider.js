@@ -1,17 +1,18 @@
 import { createHash } from 'node:crypto';
+import { readSpeechPcm } from './speechStream.js';
 
-export const speechVoices = ['Sulafat', 'Algieba'];
+export const speechVoices = ['Algieba'];
 const model = 'gemini-3.8-flash-lite-tts';
 const endpoint = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 const maxAudioBytes = 8 * 1024 * 1024;
 const failure = (code, status = 503, retryAfterSeconds) => Object.assign(new Error('Speech is unavailable.'), { code, status, retryAfterSeconds });
 
 export function validateSpeech(body) {
-  if (!body || Object.keys(body).some(key => !['text', 'language', 'voice', 'consent'].includes(key))
+  if (!body || Object.keys(body).some(key => !['text', 'language', 'voice', 'consent', 'stream'].includes(key))
     || typeof body.text !== 'string' || !body.text.trim() || body.text.length > 2400
     || !['rw', 'en', 'fr'].includes(body.language) || !speechVoices.includes(body.voice)
-    || body.consent !== true) throw failure('invalid_speech', 400);
-  return { text: body.text, language: body.language, voice: body.voice };
+    || body.consent !== true || body.stream != null && typeof body.stream !== 'boolean') throw failure('invalid_speech', 400);
+  return { text: body.text, language: body.language, voice: body.voice, stream: body.stream === true };
 }
 
 async function responseJson(response) {
@@ -47,14 +48,15 @@ export function createSpeechProvider({ apiKey = '', freeTierConfirmed = false, d
   }
   return {
     available,
-    async generate(uid, body, signal) {
+    async generate(uid, body, signal, onAudio) {
       const input = validateSpeech(body);
+      if (input.stream && typeof onAudio !== 'function') throw failure('invalid_speech', 400);
       if (typeof uid !== 'string' || !uid) throw failure('invalid_identity', 401);
       if (!available) throw failure('speech_unconfigured');
       signal?.throwIfAborted();
       cleanCache();
       const id = createHash('sha256').update(JSON.stringify([uid, input])).digest('hex');
-      if (cache.has(id)) return cache.get(id).audio;
+      if (cache.has(id)) { const audio = cache.get(id).audio; if (input.stream) await onAudio(audio); return audio; }
       const today = new Date(now()).toISOString().slice(0, 10);
       if (day !== today) { day = today; attempts = 0; owners.clear(); }
       if (cooldownUntil > now()) throw failure('speech_rate_limited', 429, Math.ceil((cooldownUntil - now()) / 1000));
@@ -73,8 +75,8 @@ export function createSpeechProvider({ apiKey = '', freeTierConfirmed = false, d
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
           body: JSON.stringify({ model, store: false, input: [{ type: 'user_input', content: [{
             type: 'text', text: input.text,
-            annotations: [{ type: 'speech_metadata', style: 'Warm, calm, clear, conversational delivery at a steady pace.' }],
-          }] }], response_format: { type: 'audio', mime_type: 'audio/wav' },
+            annotations: [{ type: 'speech_metadata', style: 'Smooth, calm, clear, conversational delivery at a steady pace.' }],
+          }] }], ...(input.stream ? { stream: true } : {}), response_format: { type: 'audio', mime_type: input.stream ? 'audio/l16' : 'audio/wav', ...(input.stream ? { sample_rate: 24000 } : {}) },
           generation_config: { speech_config: [{ voice: input.voice }] } }),
         });
         if (response.status === 429) {
@@ -84,14 +86,18 @@ export function createSpeechProvider({ apiKey = '', freeTierConfirmed = false, d
           throw failure('speech_rate_limited', 429, seconds);
         }
         if (!response.ok) { await response.body?.cancel(); throw failure('speech_unavailable'); }
-        const data = await responseJson(response);
-        const block = data.steps?.filter(step => step.type === 'model_output')
-          .flatMap(step => step.content || []).filter(part => part.type === 'audio').at(-1);
-        if (!block || block.mime_type !== 'audio/wav' || typeof block.data !== 'string'
-          || !/^[A-Za-z0-9+/]+={0,2}$/.test(block.data)) throw failure('speech_unavailable');
-        const audio = Buffer.from(block.data, 'base64');
-        if (audio.length <= 44 || audio.length > maxAudioBytes || audio.toString('ascii', 0, 4) !== 'RIFF'
-          || audio.toString('ascii', 8, 12) !== 'WAVE') throw failure('speech_unavailable');
+        let audio;
+        if (input.stream) audio = await readSpeechPcm(response, onAudio, requestSignal);
+        else {
+          const data = await responseJson(response);
+          const block = data.steps?.filter(step => step.type === 'model_output')
+            .flatMap(step => step.content || []).filter(part => part.type === 'audio').at(-1);
+          if (!block || block.mime_type !== 'audio/wav' || typeof block.data !== 'string'
+            || !/^[A-Za-z0-9+/]+={0,2}$/.test(block.data)) throw failure('speech_unavailable');
+          audio = Buffer.from(block.data, 'base64');
+          if (audio.length <= 44 || audio.length > maxAudioBytes || audio.toString('ascii', 0, 4) !== 'RIFF'
+            || audio.toString('ascii', 8, 12) !== 'WAVE') throw failure('speech_unavailable');
+        }
         requestSignal.throwIfAborted();
         // Keep only bounded, short-lived audio for this owner. No database or disk writes.
         while (cache.size && (cache.size >= 12 || cacheBytes + audio.length > 24 * 1024 * 1024)) {

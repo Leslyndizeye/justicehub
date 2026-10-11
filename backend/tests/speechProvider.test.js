@@ -6,7 +6,7 @@ import { speechRouter } from '../speechRoutes.js';
 import { requireFirebaseIdentity } from '../firebaseIdentity.js';
 
 const text = 'Do not change the amount RWF 100000 or the deadline of 30 days.';
-const input = {text,language:'en',voice:'Sulafat',consent:true};
+const input = {text,language:'en',voice:'Algieba',consent:true};
 function wav() {
   const value = Buffer.alloc(46);
   value.write('RIFF'); value.writeUInt32LE(38,4); value.write('WAVEfmt ',8);
@@ -40,7 +40,7 @@ test('speech sends the exact selected text with structured style and stateless a
     assert.equal(body.model,'gemini-3.8-flash-lite-tts');
     assert.equal(body.store,false);
     assert.equal(body.input[0].content[0].text,text);
-    assert.equal(body.generation_config.speech_config[0].voice,'Sulafat');
+    assert.equal(body.generation_config.speech_config[0].voice,'Algieba');
     assert.equal(body.response_format.mime_type,'audio/wav');
     assert.doesNotMatch(options.body,/alice|bob|history|previous_interaction_id|database|memory/);
     return audioResponse();
@@ -50,7 +50,7 @@ test('speech sends the exact selected text with structured style and stateless a
   assert.equal(calls,1);
   await provider.generate('bob',input);
   assert.equal(calls,2);
-  for (const change of [{consent:false},{language:'de'},{voice:'Cove'},{text:'x'.repeat(2401)},{model:'paid-model'},{uid:'bob'}]) {
+  for (const change of [{consent:false},{language:'de'},{voice:'Cove'},{voice:'Sulafat'},{stream:'true'},{text:'x'.repeat(2401)},{model:'paid-model'},{uid:'bob'}]) {
     assert.throws(()=>validateSpeech({...input,...change}),{code:'invalid_speech'});
   }
 });

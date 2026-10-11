@@ -13,10 +13,27 @@ export function speechRouter({ provider }) {
     const cancel = () => { if (!res.writableEnded) controller.abort(); };
     res.on('close', cancel);
     try {
-      const audio = await provider.generate(req.identity.uid, req.body, controller.signal);
-      if (!controller.signal.aborted) res.type('audio/wav').send(audio);
+      const audio = await provider.generate(req.identity.uid, req.body, controller.signal, async chunk => {
+        controller.signal.throwIfAborted();
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'audio/pcm');
+          res.setHeader('Cache-Control', 'private, no-store, no-transform');
+          res.setHeader('X-Accel-Buffering', 'no');
+        }
+        if (!res.write(chunk)) await new Promise((resolve, reject) => {
+          const clean = () => { res.off('drain', drain); res.off('close', closed); };
+          const drain = () => { clean(); resolve(); };
+          const closed = () => { clean(); reject(new Error('Audio request closed')); };
+          res.once('drain', drain); res.once('close', closed);
+        });
+      });
+      if (!controller.signal.aborted) {
+        if (req.body.stream === true) res.end();
+        else res.type('audio/wav').send(audio);
+      }
     } catch (error) {
       if (controller.signal.aborted) return;
+      if (res.headersSent) { res.destroy(); return; }
       const code = ['invalid_speech', 'speech_unconfigured', 'speech_rate_limited', 'speech_busy'].includes(error?.code)
         ? error.code : 'speech_unavailable';
       const status = code === 'invalid_speech' ? 400 : ['speech_rate_limited', 'speech_busy'].includes(code) ? 429 : 503;
