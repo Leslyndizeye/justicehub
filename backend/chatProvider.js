@@ -10,6 +10,10 @@ import { casualReply } from '../shared/chatCasual.js';
 import { externalSearchNotice, finishExternalReply } from './externalSearch.js';
 import { providerFailure } from './chatDiagnostics.js';
 import { finishLawReply } from './lawSources.js';
+import { vatOverviewAnswer } from './vatOverviewAnswer.js';
+import {lawExcerptMetadata} from './lawArticles.js';
+import {unsupportedArticleCitations,unsupportedFilingPeriod,sourceReadingReply} from './lawGrounding.js';
+import {referencesForQuestion} from './legalReferences.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -82,13 +86,18 @@ export function boundedContext(history = [], legalDocs = []) {
     recent.unshift(item);
     remaining -= item.content.length;
   }
-  remaining = 4000;
+  const articleContext=legalDocs.some(doc=>['complete_article','partial_article'].includes(doc.coverage));
+  remaining = articleContext ? 8000 : 4000;
   const excerpts = legalDocs.slice(0, 4).map(doc => {
     const content = String(doc.content || '');
-    const excerpt = content.slice(0, Math.min(1600, remaining));
+    // Whole PDF articles retain their conditions and exceptions. If the
+    // remaining budget cannot hold one, omit it rather than presenting a
+    // chopped article as a complete provision.
+    if(doc.coverage && content.length>Math.min(6000,remaining))return null;
+    const excerpt = content.slice(0, Math.min(doc.coverage ? 6000 : 1600, remaining));
     remaining -= excerpt.length;
-    return { ...doc, content: excerpt + (excerpt.length < content.length ? '\n[Excerpt truncated; verify the full official text.]' : '') };
-  }).filter(doc => doc.content && !doc.content.startsWith('\n[Excerpt truncated;'));
+    return { ...doc, ...(excerpt.length<content.length && doc.coverage ? {coverage:'partial_article'} : {}), content: excerpt + (excerpt.length < content.length ? '\n[Excerpt truncated; verify the full official text.]' : '') };
+  }).filter(doc => doc?.content && !doc.content.startsWith('\n[Excerpt truncated;'));
   return { history: recent, legalDocs: excerpts };
 }
 
@@ -106,7 +115,8 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         if (streaming) onEvent('token', { text: greeting });
         return greeting;
       }
-      const referencedAnswer = referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language);
+      const referencedAnswer = vatOverviewAnswer(message, legalDocs, language)
+        || referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language);
       if (referencedAnswer) {
         if (streaming) onEvent('token', { text: referencedAnswer });
         return referencedAnswer;
@@ -149,7 +159,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
           const requestSignal = signal ? AbortSignal.any([signal, requestTimeout]) : requestTimeout;
           let text = '';
           const bufferLanguage = ['rw', 'fr'].includes(language);
-          const reviewVocabulary = needsVocabularyReview(message, history);
+          const reviewVocabulary = needsVocabularyReview(message, history) || (legalDocs || []).some(doc=>lawExcerptMetadata(doc));
           let releasedDraft = false;
           let translatingDraft = false;
           let translationTimeout;
@@ -205,6 +215,14 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
               const safeReply = correctedVocabularyReply({ message, history, language, issues });
               onEvent('status', { text: copy.vocabularyRecovery, webSearch: false });
               if (streaming) onEvent('token', { text: safeReply });
+              cooldowns.delete(candidate);
+              return safeReply;
+            }
+            const sourceContext=boundedContext([],legalDocs).legalDocs;
+            const suppliedReferences=[...sourceContext,...referencesForQuestion(interpretLegalQuestion(message,history))];
+            if(unsupportedArticleCitations(text,suppliedReferences,externalSearchResult).length || unsupportedFilingPeriod(text,sourceContext,externalSearchResult)) {
+              const safeReply=sourceReadingReply(sourceContext,language);
+              if(streaming)onEvent('token',{text:safeReply});
               cooldowns.delete(candidate);
               return safeReply;
             }

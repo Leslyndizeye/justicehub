@@ -78,7 +78,7 @@ export function createTavilySearch({ apiKey, fetchImpl = fetch, now = Date.now, 
             blockedUntil = Date.UTC(new Date(now()).getUTCFullYear(), new Date(now()).getUTCMonth() + 1, 1);
             return failure('usage');
           }
-          const sources = normalizeSearchSources(response.results, plan.legal);
+          const sources = normalizeSearchSources(response.results, plan.legal, plan.legalTopic);
           if (!sources.length) return failure('empty', 'empty');
           const result = { status: 'ok', sources, retrievedAt: new Date(now()).toISOString() };
           // Cache only evidence for the sanitized public query, never a personal reply.

@@ -1,5 +1,6 @@
 import { interpretLegalQuestion } from './legalQuestion.js';
 import { interpretCasualMessage } from '../shared/chatCasual.js';
+import { vatQuestion } from './legalTaxTopic.js';
 
 const legalWords = /\b(?:law\w*|legal|penalt\w*|sentenc\w*|bail|rights|tax\w*|employment|land|constitution|lois?|juridique|droits|impôts|amategeko|icyaha|igihano|uburenganzira|imisoro|umusoro|ubutaka|akazi|ahanish\w*)\b/i;
 const currentWords = /\b(?:latest|current|recent|today|news|new|updates?|amend\w*|actualités|récentes?|dernières?|nouvelles|aujourd'hui|mashya|vuba|uyu munsi|agezweho|amakuru|202[5-9])\b/i;
@@ -16,6 +17,8 @@ export function publicSearchPlan(message, history = []) {
   if (/^(?:hello|hi|hey+|yoo+|muraho|mwiriwe|mwaramutse|thanks|murakoze)[!.?\s]*$/i.test(message.trim())) return null;
   if (/\b(?:your purpose|my name|remember about me|izina ryanjye|uranyibuka)\b/i.test(message)) return null;
   const interpretation = interpretLegalQuestion(message, history);
+  const vat = vatQuestion(message, history);
+  if (vat) return {query:`Rwanda value added tax VAT law 049/2023 amendments${vat.article ? ` article ${vat.article}` : ''}`, legal:true, legalTopic:'vat', topic:'general'};
   let topic = interpretation.topics.join(' ').replaceAll('_', ' ');
   if (!topic) topic = topics.find(([pattern]) => pattern.test(message))?.[1] || '';
   // A short current-law follow-up can refer to the latest user topic.
@@ -48,7 +51,7 @@ function resultUrl(value) {
   } catch { return null; }
 }
 
-export function normalizeSearchSources(results = [], legal = false) {
+export function normalizeSearchSources(results = [], legal = false, legalTopic) {
   const unique = new Set();
   const sources = [];
   for (const result of results) {
@@ -57,6 +60,14 @@ export function normalizeSearchSources(results = [], legal = false) {
     const official = /(?:^|\.)(?:gov\.rw|parliament\.gov\.rw|judiciary\.gov\.rw|rwandalii\.org)$/.test(new URL(url).hostname);
     // A legal result from an unrelated blog does not establish Rwanda law.
     if (legal && !official) continue;
+    if (legalTopic === 'vat') {
+      // An official domain alone is not evidence for the requested tax. Match
+      // the document's identity, not a generic site's unrelated navigation.
+      let path = new URL(url).pathname;
+      try { path = decodeURI(path); } catch { /* A malformed escape cannot crash search. */ }
+      const identity = `${result.title || ''} ${path}`;
+      if (!/\b(?:VAT|TVA)\b|value[ _-]added[ _-]tax|nyonger(?:a|era)gaciro|valeur[ _-]ajout|049[\/_-]2023|(?:2023[ _-]VAT|VAT[ _-]law)/i.test(identity)) continue;
+    }
     const raw = typeof result.raw_content === 'string' ? result.raw_content.trim() : '';
     const excerpt = (raw || String(result.content || '')).replace(/\s+/g, ' ').slice(0, 1100);
     if (!excerpt) continue;

@@ -1,4 +1,5 @@
 import catalog from './data/amategekoCatalog.json' with {type:'json'};
+import { excerptArticles } from './lawArticles.js';
 
 const documents = new Map(catalog.documents.map(doc=>[doc.key,doc]));
 
@@ -19,12 +20,16 @@ export function finishLawReply(text, excerpts = [], language = 'en') {
         || url.hash !== `#page=${page}` || page < 1 || page > doc.pages) continue;
       url.hash = '';
       if (text.includes(url.href)) continue;
-      const source = sources.get(url.href) || {title:doc.title.replace(/[\[\]\\\r\n]/g,' ').slice(0,170),url:excerpt.source,pages:new Set()};
-      source.pages.add(page); sources.set(url.href,source);
+      const source = sources.get(url.href) || {title:(doc.filename || doc.title).replace(/[\[\]\\\r\n]/g,' ').slice(0,170),url:excerpt.source,pages:new Set(),articles:new Set()};
+      source.pages.add(page);
+      for(const extra of excerpt.pdfPages || [])if(Number.isInteger(extra) && extra>=page && extra<=doc.pages)source.pages.add(extra);
+      for (const number of excerptArticles(excerpt)) source.articles.add(number);
+      sources.set(url.href,source);
     } catch { /* Malformed source metadata never becomes a clickable citation. */ }
   }
   if (!sources.size) return text;
   const label = {en:'Reference PDFs (published versions)',rw:'Inyandiko za PDF zifashishijwe (zashyizwe ahagaragara)',fr:'PDF de référence (versions publiées)'}[language] || 'Reference PDFs (published versions)';
   const pageWord = {en:'pages',rw:'paji',fr:'pages'}[language] || 'pages';
-  return `${text}\n\n${label}:\n${[...sources.values()].map(source=>`- [${source.title}](${source.url}) — ${pageWord} ${[...source.pages].sort((a,b)=>a-b).join(', ')}`).join('\n')}`;
+  const articleWord = {en:'Articles',rw:'Ingingo',fr:'Articles'}[language] || 'Articles';
+  return `${text}\n\n${label}:\n${[...sources.values()].map(source=>`- [${source.title}](${source.url}) — ${source.articles.size ? `${articleWord} ${[...source.articles].sort((a,b)=>a-b).join(', ')}; ` : ''}PDF ${pageWord} ${[...source.pages].sort((a,b)=>a-b).join(', ')}`).join('\n')}`;
 }

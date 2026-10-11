@@ -5,7 +5,7 @@ import { retryDelaySeconds } from './chatProvider.js';
 
 // Only tool evidence is retained. A model's generated answer is never promoted
 // to a source, even when it contains plausible links or legal provisions.
-export function browserSearchSources(tools = [], legal = false) {
+export function browserSearchSources(tools = [], legal = false, legalTopic) {
   const results = [];
   for (const tool of tools.slice(0, 30)) {
     if (!tool?.name?.startsWith('browser.')) continue;
@@ -19,7 +19,7 @@ export function browserSearchSources(tools = [], legal = false) {
     const excerpt = output.replace(/^(?:URL|Title|Source):[^\n]*(?:\n|$)/gm, '').trim();
     if (excerpt) results.unshift({ url, title: output.match(/(?:^|\n)Title:\s*([^\n]+)/)?.[1], raw_content: excerpt });
   }
-  return normalizeSearchSources(results, legal);
+  return normalizeSearchSources(results, legal, legalTopic);
 }
 
 export function createSearchFallback({ primary, client, enabled = false, model = 'openai/gpt-oss-20b', now = Date.now, timeoutMs = 30000, cacheTtlMs = 15 * 60 * 1000 }) {
@@ -56,7 +56,7 @@ export function createSearchFallback({ primary, client, enabled = false, model =
             ],
           }, { signal: requestSignal });
           signal?.throwIfAborted();
-          const sources = browserSearchSources(completion.choices?.[0]?.message?.executed_tools, plan.legal);
+          const sources = browserSearchSources(completion.choices?.[0]?.message?.executed_tools, plan.legal, plan.legalTopic);
           if (!sources.length) {
             blockedReason = 'no_evidence';
             blockedUntil = now() + 60000;
