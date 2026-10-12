@@ -41,12 +41,12 @@ const periods=[
 export function unsupportedFilingPeriod(text,excerpts,externalSearchResult) {
   if(externalSearchResult?.sources?.length)return false;
   const body=excerpts.filter(doc=>lawExcerptMetadata(doc)).map(doc=>String(doc.content).split('\n').slice(2).join('\n')).join('\n');
-  if(!/declar\w*|imenyekan\w*|kumenyekan\w*/i.test(body))return false;
+  if(!/declar\w*|menyekan\w*/i.test(body))return false;
   return periods.some(pattern=>{
     if(pattern.test(body))return false;
     const match=String(text).match(pattern);
     if(!match)return false;
     const context=text.slice(Math.max(0,match.index-80),match.index+match[0].length+80);
-    return /\b\d+\b|declar\w*|imenyekan\w*|bamenyesha|after|nyuma/i.test(context);
+    return /\b\d+\b|declar\w*|menyekan\w*|bamenyesha|after|nyuma/i.test(context);
   });
 }

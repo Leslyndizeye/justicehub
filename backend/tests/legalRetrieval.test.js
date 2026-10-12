@@ -1,7 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {legalSearchTerms, rankLegalDocuments, searchLegalDocs} from '../legalRetrieval.js';
+import {legalSearchTerms, rankLegalDocuments, searchLegalDocs as searchStoredLegalDocs} from '../legalRetrieval.js';
 import {buildChatMessages} from '../chatPrompt.js';
+const searchLegalDocs=(client,message,history=[],language='en')=>searchStoredLegalDocs(client,message,history,language,{localSearch:()=>[]});
 
 const passage=(language,page,text,part=1)=>({title:`Law No. 027/2019 — ${language}, PDF page ${page}`,
   source:`https://sources.example/criminal-procedure.pdf#page=${page}`,year:2019,

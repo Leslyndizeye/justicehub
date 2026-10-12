@@ -14,6 +14,7 @@ import { vatOverviewAnswer } from './vatOverviewAnswer.js';
 import {lawExcerptMetadata} from './lawArticles.js';
 import {unsupportedArticleCitations,unsupportedFilingPeriod,sourceReadingReply} from './lawGrounding.js';
 import {referencesForQuestion} from './legalReferences.js';
+import {evidenceBundle,evidenceResponseFormat,validateEvidenceAnswer,renderEvidenceAnswer} from './evidenceAnswer.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -147,12 +148,15 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
           const showLookupNotice = externalSearch ? Boolean(lookupNotice) : recoveredLookup;
           const search = createSearchTracker({ language });
           const gptOss = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(candidate);
+          const context=boundedContext(reviewedVocabularyHistory(history),legalDocs);
+          const evidenceMode=gptOss && context.legalDocs.some(doc=>doc.coverage && lawExcerptMetadata(doc));
+          const bundle=evidenceMode ? evidenceBundle(message,history,context.legalDocs,externalSearchResult) : null;
           const request = {
             model: candidate,
-            messages: buildChatMessages({ message, role, ...boundedContext(reviewedVocabularyHistory(history), legalDocs), correction, replyLanguage: language, externalSearchResult, searchEnabled: !externalSearch && !recoveredLookup && webSearchEnabled(candidate, searchSetting), now: new Date(now()), instructionRole: gptOss ? 'developer' : 'system' }),
-            temperature: 0.4,
+            messages: buildChatMessages({ message, role, ...context, ...(bundle?{legalDocs:bundle.docs}:{}), evidenceMode, correction, replyLanguage: language, externalSearchResult:bundle?.research || externalSearchResult, searchEnabled: !evidenceMode && !externalSearch && !recoveredLookup && webSearchEnabled(candidate, searchSetting), now: new Date(now()), instructionRole: gptOss ? 'developer' : 'system' }),
+            temperature: evidenceMode ? 0.1 : 0.4,
             max_completion_tokens: 2048,
-            ...(externalSearch ? { tool_choice: 'none' } : !recoveredLookup ? searchOptions(candidate, message, searchSetting) : {}),
+            ...(evidenceMode ? {response_format:evidenceResponseFormat(bundle)} : externalSearch ? { tool_choice: 'none' } : !recoveredLookup ? searchOptions(candidate, message, searchSetting) : {}),
             ...(gptOss ? { reasoning_effort: ['low', 'medium', 'high'].includes(reasoningEffort) ? reasoningEffort : 'medium', include_reasoning: false } : {}),
           };
           const requestTimeout = AbortSignal.timeout(requestTimeoutMs);
@@ -164,6 +168,20 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
           let translatingDraft = false;
           let translationTimeout;
           try {
+            if(evidenceMode) {
+              // Structured Outputs do not support streaming/tools. Raw JSON and
+              // unchecked legal claims never become visible UI tokens.
+              const completion=await client.chat.completions.create({...request,stream:false},{signal:requestSignal});
+              signal?.throwIfAborted();
+              const result=validateEvidenceAnswer(completion.choices?.[0]?.message?.content || '',bundle,message,language);
+              let reply=result.ok ? renderEvidenceAnswer(result,language) : sourceReadingReply(context.legalDocs,language);
+              const conflicts=vocabularyIssues(message,history,reply);
+              if(conflicts.length)reply=correctedVocabularyReply({message,history,language,issues:conflicts});
+              if(showLookupNotice)reply=lookupNotice+reply;
+              if(streaming)onEvent('token',{text:reply});
+              cooldowns.delete(candidate);
+              return reply;
+            }
             if (streaming) {
               const tokens = await client.chat.completions.create({ ...request, stream: true }, { signal: requestSignal });
               for await (const chunk of tokens) {

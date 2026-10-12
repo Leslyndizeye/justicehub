@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "eval:chat": "node evals/assistant-behavior.js",
+    "eval:retrieval": "node evals/legal-retrieval.js",
     "import:laws": "node scripts/importAmategeko.js",
     "index:laws": "node scripts/indexLawArticles.js",
     "build": "echo 'No build step required'",

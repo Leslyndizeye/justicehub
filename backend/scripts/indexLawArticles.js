@@ -5,10 +5,14 @@ const data = new URL('../data/', import.meta.url);
 const corpus = JSON.parse(fs.readFileSync(new URL('amategeko.json', data), 'utf8'));
 const catalog = JSON.parse(fs.readFileSync(new URL('amategekoCatalog.json', data), 'utf8'));
 const documents = {};
+const report=fs.readFileSync(new URL('amategeko-import-report.md',data),'utf8');
 for (const document of corpus.documents) {
   const metadata = catalog.documents.find(item => item.key === document.key);
   if (!metadata) continue;
   metadata.filename = document.originalFilename;
+  const archive=[...report.matchAll(/https:\/\/[^\s)]+\/storage\/v1\/object\/public\/justicehub-legal-sources\/amategeko\/[a-f0-9]{64}\.pdf/g)]
+    .map(match=>match[0]).find(url=>url.endsWith(`/${document.sha256}.pdf`));
+  if(archive)metadata.archiveSource=archive;
   const languages = {};
   for (const chunk of document.chunks.filter(item => item.page >= metadata.provisionsFrom)) {
     for (const number of articleHeadings(chunk.text)) {

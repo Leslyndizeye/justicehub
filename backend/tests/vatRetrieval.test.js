@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import corpus from '../data/amategeko.json' with {type:'json'};
 import catalog from '../data/amategekoCatalog.json' with {type:'json'};
-import { searchLegalDocs } from '../legalRetrieval.js';
+import { searchLegalDocs as searchStoredLegalDocs } from '../legalRetrieval.js';
 import { vatQuestion } from '../legalTaxTopic.js';
 import { excerptArticles } from '../lawArticles.js';
 import { publicSearchPlan, normalizeSearchSources } from '../externalSearch.js';
@@ -13,6 +13,7 @@ import { finishLawReply } from '../lawSources.js';
 import { vatOverviewAnswer, isBasicVatOverview } from '../vatOverviewAnswer.js';
 
 const message = 'amategeko avuga ku ki kumusorowinyongerera gaciro ?';
+const searchLegalDocs=(client,message,history=[],language='en')=>searchStoredLegalDocs(client,message,history,language,{localSearch:()=>[]});
 const law = corpus.documents.find(doc=>doc.key === 'law-49-2023');
 const metadata = catalog.documents.find(doc=>doc.key === law.key);
 const base = `https://sources.example/storage/v1/object/public/justicehub-legal-sources/amategeko/${metadata.sha256}.pdf`;
@@ -85,11 +86,11 @@ test('article citations retain the original filename and differ from navigation 
   assert.match(footer,/Ingingo 28; PDF paji 47, 48/);
   const events=[];
   const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',searchSetting:'false',
-    client:{chat:{completions:{async create(){return (async function*(){yield{choices:[{delta:{content:'Iyi ngingo ivuga imenyekanisha ry’umusoro ku nyongeragaciro.'}}]};})();}}}}});
+    client:{chat:{completions:{async create(){return {choices:[{message:{content:JSON.stringify({status:'answered',points:[{kind:'rule',statement:'Taxpayers may choose monthly declarations.',evidence:[{source_id:'P1',paragraph:4,quote:excerpts[0].content.match(/\(4\)[\s\S]*?(?=\(5\))/)[0].trim()}]}]})}}]};}}}}});
   const reply=await provider.reply({message:'Explain VAT article 28 in English',legalDocs:excerpts,replyLanguage:'en',streaming:true,
     onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
   assert.equal(events.join(''),reply);
-  assert.match(reply,/Articles 28; PDF pages 47, 48/);
+  assert.match(reply,/Article 28\(4\)/);
 });
 
 test('the basic dated VAT overview preserves exemptions, the threshold boundary and optional monthly filing without model/search quotas',async()=>{
