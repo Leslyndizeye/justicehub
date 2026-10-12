@@ -1,5 +1,5 @@
 import { createAuthenticatedFetch } from '../lib/authenticatedFetch.js';
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { auth } from './firebaseConfig';
 import ChatMarkdown from './ChatMarkdown';
 import { useProgressiveText } from './useProgressiveText';
@@ -17,6 +17,7 @@ import { createAnswerReader } from '../lib/answerReader.js';
 import ReadAloudButton from './ReadAloudButton';
 import { StatusPanel } from './StatusScreen';
 import DeleteConversationDialog from './DeleteConversationDialog';
+import { createAmbientRain } from '../lib/ambientRain.js';
 import { recoveryState, requestError } from '../lib/recoveryState.js';
 
 const API = apiBaseUrl(import.meta.env.VITE_API_URL, import.meta.env.DEV);
@@ -84,6 +85,27 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
   const sessionsRef = useRef<ChatSession[]>([]);
   const sessionsRequest = useRef(0);
   const [rainActive, setRainActive] = useState(false);
+  const [rainError, setRainError] = useState('');
+  const rainPlayer = useMemo(() => createAmbientRain(), []);
+  const rainEnabled = useRef(false);
+  const rainAttempt = useRef(0);
+  useEffect(() => () => { rainEnabled.current = false; rainAttempt.current++; rainPlayer.stop(); }, [rainPlayer]);
+
+  const toggleRain = async () => {
+    const attempt = ++rainAttempt.current;
+    const enabled = !rainEnabled.current;
+    rainEnabled.current = enabled;
+    setRainActive(enabled);
+    setRainError('');
+    if (!enabled) { rainPlayer.stop(); return; }
+    try { await rainPlayer.start(); }
+    catch {
+      if (!rainEnabled.current || rainAttempt.current !== attempt) return;
+      rainEnabled.current = false;
+      setRainActive(false);
+      setRainError('Rain sound couldn’t start. Please try again.');
+    }
+  };
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<ChatSession | null>(null);
   const [deletingSession, setDeletingSession] = useState(false);
@@ -97,6 +119,18 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
   const shouldAutoScroll = useRef(true);
   const streamRequest = useRef<AbortController | null>(null);
   const skipSessionLoad = useRef<string | null>(null);
+
+  const resizeComposer = useCallback(() => {
+    const input = composerRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${input.scrollHeight}px`;
+  }, []);
+  useLayoutEffect(resizeComposer, [resizeComposer, currentPrompt, loading, activeSessionId, messagesLoading, messagesError, sessionsReady, sessionsError]);
+  useEffect(() => {
+    window.addEventListener('resize', resizeComposer);
+    return () => window.removeEventListener('resize', resizeComposer);
+  }, [resizeComposer]);
 
   useEffect(() => () => { streamRequest.current?.abort(); }, []);
 
@@ -570,9 +604,10 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         </nav>
 
         <div className="chat-sidebar-bottom">
-          <button type="button" onClick={() => setRainActive(active => !active)} className={`chat-ambient-button ${rainActive ? 'is-active' : ''}`} aria-pressed={rainActive}>
+          <button type="button" onClick={() => void toggleRain()} className={`chat-ambient-button ${rainActive ? 'is-active' : ''}`} aria-pressed={rainActive}>
             <CloudRain size={17} aria-hidden="true" /><span>Ambient rain</span><span className="chat-toggle-track" aria-hidden="true"><span /></span>
           </button>
+          {rainError && <p className="chat-rain-notice" role="status">{rainError}</p>}
           <div className="chat-account">
             <div className="chat-account-avatar" aria-hidden="true">{displayName.charAt(0).toUpperCase()}</div>
             <div className="chat-account-text"><span>{displayName}</span><small>{userRole === 'citizen' ? 'Citizen account' : userRole}</small></div>
@@ -609,7 +644,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         {!conversationError && !conversationPending && <div className="chat-composer-area">
           {rateLimit && <div role="status" className="chat-quota-notice">{rateLimitNotice(waitSeconds, rateLimit.language)}</div>}
           <div className="chat-composer">
-            <textarea ref={composerRef} value={currentPrompt} onChange={e => setCurrentPrompt(e.target.value)}
+            <textarea ref={composerRef} rows={1} value={currentPrompt} onChange={e => setCurrentPrompt(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
               aria-label="Message JusticeHub" placeholder="Ask anything, in your own words…" className="chat-input custom-scrollbar" />
             <button type="button" onClick={() => isAnalysing ? streamRequest.current?.abort() : sendMessage()}
@@ -718,23 +753,23 @@ const MessageBubble: React.FC<{ message: Message; reader: ReturnType<typeof crea
   );
 };
 
-const RainEffect = () => (
-  <div className="chat-rain" aria-hidden="true">
-    <div className="absolute inset-0 rain-container overflow-hidden">
-      {[...Array(60)].map((_, i) => (
+const RainEffect = React.memo(() => {
+  // Keep the drops steady while tokens arrive and the dashboard rerenders.
+  const drops = useMemo(() => Array.from({ length: 36 }, () => ({
+    left: `${Math.random() * 100}%`,
+    animationDuration: `${2.2 + Math.random() * 2}s`,
+    animationDelay: `${-Math.random() * 5}s`,
+    opacity: 0.12 + Math.random() * 0.18,
+  })), []);
+  return <div className="chat-rain" aria-hidden="true">
+      {drops.map((style, i) => (
         <div
           key={i}
           className="rain-drop"
-          style={{
-            left: `${Math.random() * 100}%`,
-            animationDuration: `${0.8 + Math.random() * 2}s`,
-            animationDelay: `${Math.random() * 3}s`,
-            opacity: 0.1 + Math.random() * 0.3
-          }}
+          style={style}
         />
       ))}
-    </div>
-  </div>
-);
+    </div>;
+});
 
 export default Dashboard;

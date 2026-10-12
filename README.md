@@ -189,6 +189,8 @@ The backend requires `SUPABASE_SERVICE_ROLE_KEY` for protected API access; start
 
 ## App notes
 
+The **Ambient rain** switch plays quiet synthesized rain sound locally in the browser and displays subtle rainfall. It starts only when clicked and stops when switched off or when leaving the dashboard. There is no audio API, download, database entry or fee. Browsers must support Web Audio and allow playback; a failed start leaves the switch off. Reduced-motion settings hide the animation while keeping the sound available.
+
 Routes are `/`, `/auth`, `/dashboard`, `/dashboard/:sessionId`, and `/adminxt`. `/dashboard` starts a new conversation. Saved conversations use their session ID in the URL, so refresh and browser Back/Forward reopen the selected chat. Opening a protected chat link before signing in returns to that chat after login. Local-only memory exchanges are still separate from saved database messages.
 
 The chat list loads independently of the profile request at sign-in. History requests have a ten-second timeout and show a retry action on failure. Login and signup fields start empty and use prompts instead of example names, emails, or masked password placeholders. The form requests that browser autofill stay off; a browser or password manager can still override this setting.
