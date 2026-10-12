@@ -7,6 +7,8 @@ import {chatErrorDiagnostic} from '../chatDiagnostics.js';
 import {evidenceBundle,validateEvidenceAnswer,renderEvidenceAnswer} from '../evidenceAnswer.js';
 
 const message='what are Payments exempted from employment income tax';
+// A case-specific follow-up must still exercise the model and its size recovery.
+const modelQuestion=message+' Does this apply to my employer?';
 const docs=searchLocalLaws(message);
 const research={status:'ok',provider:'tavily',sources:[1,2,3].map(number=>({title:'Income tax',url:`https://www.rra.gov.rw/tax-${number}`,excerpt:'Published income-tax research. '.repeat(35),evidence:'page_excerpt'}))};
 
@@ -59,7 +61,7 @@ test('413 causes one smaller source-checked retry with no repeat search and no q
     if(requests.length===1)throw Object.assign(new Error('Sensitive upstream details'),{status:413,error:{code:'rate_limit_exceeded'}});
     return {choices:[{message:{content:JSON.stringify({status:'insufficient',points:[]})}}]};
   }}}}});
-  const reply=await provider.reply({message,legalDocs:docs,history:[],replyLanguage:'en',streaming:true,onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
+  const reply=await provider.reply({message:modelQuestion,legalDocs:docs,history:[],replyLanguage:'en',streaming:true,onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
   assert.equal(requests.length,2);assert.equal(lookups,1);
   const size=request=>request.messages.reduce((sum,item)=>sum+item.content.length,0);
   assert.ok(size(requests[1])<size(requests[0]));
@@ -72,7 +74,7 @@ test('persistent oversize requests fail after one retry with useful localized co
   for(const language of ['en','rw','fr']) {
     let calls=0;
     const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',client:{chat:{completions:{async create(){calls++;throw Object.assign(new Error('Private detail'),{status:413});}}}}});
-    await assert.rejects(provider.reply({message,legalDocs:docs,replyLanguage:language}),error=>{
+    await assert.rejects(provider.reply({message:modelQuestion,legalDocs:docs,replyLanguage:language}),error=>{
       assert.equal(chatErrorDiagnostic(error).code,'request_too_large');
       assert.equal(publicChatError(error,language).code,'request_too_large');
       assert.doesNotMatch(publicChatError(error,language).error,/Private|wait|usage limit/);
@@ -82,6 +84,6 @@ test('persistent oversize requests fail after one retry with useful localized co
   }
   const controller=new AbortController();let calls=0;
   const provider=createChatProvider({model:'openai/gpt-oss-120b',client:{chat:{completions:{async create(){calls++;controller.abort();throw Object.assign(new Error('Too large'),{status:413});}}}}});
-  await assert.rejects(provider.reply({message,legalDocs:docs,signal:controller.signal}),{name:'AbortError'});
+  await assert.rejects(provider.reply({message:modelQuestion,legalDocs:docs,signal:controller.signal}),{name:'AbortError'});
   assert.equal(calls,1);
 });

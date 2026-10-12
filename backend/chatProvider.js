@@ -11,6 +11,7 @@ import { externalSearchNotice, finishExternalReply } from './externalSearch.js';
 import { providerFailure } from './chatDiagnostics.js';
 import { finishLawReply } from './lawSources.js';
 import { vatOverviewAnswer } from './vatOverviewAnswer.js';
+import { incomeTaxExemptionsAnswer } from './incomeTaxExemptionsAnswer.js';
 import {lawExcerptMetadata} from './lawArticles.js';
 import {unsupportedArticleCitations,unsupportedFilingPeriod,sourceReadingReply} from './lawGrounding.js';
 import {referencesForQuestion} from './legalReferences.js';
@@ -118,7 +119,8 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         if (streaming) onEvent('token', { text: greeting });
         return greeting;
       }
-      const referencedAnswer = vatOverviewAnswer(message, legalDocs, language)
+      const referencedAnswer = incomeTaxExemptionsAnswer(message, legalDocs, language)
+        || vatOverviewAnswer(message, legalDocs, language)
         || referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language);
       if (referencedAnswer) {
         if (streaming) onEvent('token', { text: referencedAnswer });
