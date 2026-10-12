@@ -13,6 +13,7 @@ test('account failures provide useful recovery messages without exposing provide
   }
   assert.match(authErrorMessage({code:'auth/email-already-in-use',message:raw}, 'signup'), /sign in or reset/);
   assert.match(authErrorMessage({code:'auth/network-request-failed',message:raw}, 'signup'), /internet connection/);
+  assert.match(authErrorMessage({code:'auth/unauthorized-domain',message:raw}, 'google'), /temporarily unavailable/);
   assert.match(authErrorMessage({code:'auth/too-many-requests',message:raw}), /wait a few minutes/);
   assert.match(authErrorMessage({code:'auth/popup-blocked',message:raw}, 'google'), /Allow pop-ups/);
   assert.match(authErrorMessage({code:'auth/expired-action-code',message:raw}, 'confirmReset'), /request a new one/);

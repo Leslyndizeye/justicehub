@@ -10,9 +10,10 @@ import {
   verifyPasswordResetCode,
   signOut
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, runTransaction } from 'firebase/firestore';
 import { auth, googleProvider, db } from './firebaseConfig';
 import { authErrorMessage } from '../lib/authErrors.js';
+import { completeGoogleSignIn, authDiagnostic } from '../lib/googleSignIn.js';
 
 type UserRole = 'attorney' | 'judge' | 'citizen' | null;
 type AuthView = 'login' | 'signup' | 'forgot' | 'verify' | 'role' | 'confirmReset';
@@ -197,19 +198,25 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack, initialMode = 'login', oobC
     setLoading(true);
     resetMessages();
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      
-      // On first sign in with Google, we might need to set a default role if it doesn't exist
-      const userDoc = doc(db, 'users', result.user.uid);
-      await setDoc(userDoc, {
-        role: 'citizen',
-        fullName: result.user.displayName,
-        email: result.user.email,
-        updatedAt: new Date()
-      }, { merge: true });
+      await completeGoogleSignIn(
+        () => signInWithPopup(auth, googleProvider),
+        async (user) => {
+          const userDoc = doc(db, 'users', user.uid);
+          await runTransaction(db, async transaction => {
+            const existing = await transaction.get(userDoc);
+            transaction.set(userDoc, {
+              ...(!existing.exists() ? { role: 'citizen' } : {}),
+              fullName: user.displayName,
+              email: user.email,
+              updatedAt: new Date()
+            }, { merge: true });
+          });
+        },
+        err => authDiagnostic(err, 'profile')
+      );
 
     } catch (err: any) {
-      if (import.meta.env.DEV) console.error('Sign-in failed:', err);
+      authDiagnostic(err, 'google-sign-in');
       setError(authErrorMessage(err, 'google'));
     } finally {
       setLoading(false);

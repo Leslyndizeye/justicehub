@@ -60,6 +60,20 @@ test('a search snippet cannot establish a legal rule and blocked research is not
   assert.equal(evidenceBundle(message,[],docs,{...research,status:'blocked'}).sources.length,bundle.sources.length);
 });
 
+test('the user child-employment question reaches the minimum-age article and retains the apprenticeship exception',()=>{
+  const question='what minimum age of kid to work';
+  const childDocs=searchLocalLaws(question);
+  const childBundle=evidenceBundle(question,[],childDocs);
+  assert.equal(childBundle.sources[0].doc.articleNumber,5);
+  const quote=childBundle.sources[0].text.replace(/^Article 5:[^\n]*\n/, '').split('The Minister')[0].trim();
+  const answer={status:'answered',points:[{kind:'rule',statement:'The minimum age is 16 years. Children aged 13–15 may perform only light work in an apprenticeship.',evidence:[{source_id:'P1',quote,paragraph:null}]}]};
+  const result=validateEvidenceAnswer(JSON.stringify(answer),childBundle,question,'en');
+  assert.equal(result.ok,true);
+  const reply=renderEvidenceAnswer(result,'en');
+  assert.match(reply,/Article 5/);assert.match(reply,/13–15/);assert.match(reply,/apprenticeship/);
+  assert.doesNotMatch(reply,/employees’ organisations|Scope of this Law/);
+});
+
 test('PDF-backed generation is a single structured request and streams only the checked rendered text',async()=>{
   let calls=0;const events=[];
   const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',searchSetting:'true',client:{chat:{completions:{async create(request){
@@ -76,5 +90,5 @@ test('invalid evidence yields the original source passage instead of a second co
   let calls=0;const events=[];
   const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',searchSetting:'false',client:{chat:{completions:{async create(){calls++;return{choices:[{message:{content:JSON.stringify(answer)}}]};}}}}});
   const reply=await provider.reply({message,legalDocs:docs,replyLanguage:'en',streaming:true,onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
-  assert.equal(calls,1);assert.equal(events.join(''),reply);assert.doesNotMatch(reply,/30 days after the week|source_id/);assert.match(reply,/supplied PDF text/);
+  assert.equal(calls,1);assert.equal(events.join(''),reply);assert.doesNotMatch(reply,/30 days after the week|source_id|\[…\]/);assert.match(reply,/exact wording/);
 });

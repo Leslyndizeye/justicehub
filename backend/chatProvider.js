@@ -174,7 +174,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
               const completion=await client.chat.completions.create({...request,stream:false},{signal:requestSignal});
               signal?.throwIfAborted();
               const result=validateEvidenceAnswer(completion.choices?.[0]?.message?.content || '',bundle,message,language);
-              let reply=result.ok ? renderEvidenceAnswer(result,language) : sourceReadingReply(context.legalDocs,language);
+              let reply=result.ok ? renderEvidenceAnswer(result,language) : sourceReadingReply(context.legalDocs,language,message);
               const conflicts=vocabularyIssues(message,history,reply);
               if(conflicts.length)reply=correctedVocabularyReply({message,history,language,issues:conflicts});
               if(showLookupNotice)reply=lookupNotice+reply;
@@ -239,7 +239,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
             const sourceContext=boundedContext([],legalDocs).legalDocs;
             const suppliedReferences=[...sourceContext,...referencesForQuestion(interpretLegalQuestion(message,history))];
             if(unsupportedArticleCitations(text,suppliedReferences,externalSearchResult).length || unsupportedFilingPeriod(text,sourceContext,externalSearchResult)) {
-              const safeReply=sourceReadingReply(sourceContext,language);
+              const safeReply=sourceReadingReply(sourceContext,language,message);
               if(streaming)onEvent('token',{text:safeReply});
               cooldowns.delete(candidate);
               return safeReply;

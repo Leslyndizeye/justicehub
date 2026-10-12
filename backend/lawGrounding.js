@@ -1,4 +1,5 @@
 import {lawExcerptMetadata,excerptArticles} from './lawArticles.js';
+import {readLawArticles} from './lawArticleReader.js';
 
 export function unsupportedArticleCitations(text, excerpts, externalSearchResult) {
   // External research can legitimately introduce a different law/article.
@@ -18,17 +19,44 @@ export function unsupportedArticleCitations(text, excerpts, externalSearchResult
   return [...new Set(issues)];
 }
 
-export function sourceReadingReply(excerpts, language) {
-  const intro={en:'I could not support that interpretation from the supplied PDF text. These are the relevant source passages; their current applicability still needs checking.',
-    rw:'Sinashoboye kwemeza ibyo bisobanuro nshingiye ku nyandiko ya PDF yatanzwe. Dore ibice by’inyandiko bijyanye n’ikibazo; niba bigikurikizwa ubu biracyakeneye kugenzurwa.',
-    fr:'Je ne peux pas confirmer cette interprétation à partir du PDF fourni. Voici les passages pertinents ; leur applicabilité actuelle reste à vérifier.'}[language] || 'These source passages need further review.';
-  return `${intro}\n\n${excerpts.slice(0,2).map(doc=>{
+export function sourceReadingReply(excerpts, language, question='') {
+  const words=[...new Set(String(question).toLowerCase().match(/[\p{L}]{4,}/gu)||[])].filter(word=>!['what','does','about','please','explain','rwanda','rwandan','labour','employment','amategeko','itegeko','avuga','mbwira','article','ingingo'].includes(word));
+  const meaning=/defin|meaning|mean\b|scope|purpose|bisobanur|ibirebwa|intego|signifi/i.test(question);
+  const background=/definitions|scope of|purpose of|ibisobanuro|ibirebwa|intego|d[eé]finitions|champ d.application|objet de/i;
+  const heading=doc=>{
+    const metadata=lawExcerptMetadata(doc);
+    return metadata && doc.articleNumber ? readLawArticles(metadata.key,metadata.language).find(article=>article.number===doc.articleNumber)?.segments[0]?.text.split('\n')[0] || '' : '';
+  };
+  const candidates=excerpts.map(doc=>({doc,body:String(doc.content).split('\n').slice(2).join('\n').trim()}))
+    .filter(item=>item.body.length>=30 && (meaning || !background.test(heading(item.doc) || item.body.split('\n')[0])));
+  const score=text=>words.reduce((sum,word)=>sum+(text.toLowerCase().includes(word)?1:0),0);
+  candidates.sort((a,b)=>score(b.body)-score(a.body));
+  const selected=candidates[0];
+  if(!selected) {
+    // A broad query returning only definitions cannot establish a case-specific
+    // rule. Ask for the topic instead of dumping unrelated clipped paragraphs.
+    const labour=excerpts.some(doc=>lawExcerptMetadata(doc)?.key==='law-66-2018');
+    if(!labour)return {en:'Which legal issue or provision would you like me to explain? I do not have a relevant passage for a reliable answer yet.',rw:'Ni ikihe kibazo cy’amategeko cyangwa ingingo ushaka ko nsobanura? Nta gice cy’inyandiko gihagije mfite cyo kugusubiza neza.',fr:'Quel sujet juridique ou quelle disposition souhaitez-vous comprendre ? Je n’ai pas encore de passage pertinent pour une réponse fiable.'}[language] || 'Which legal issue would you like me to explain?';
+    return {en:'Which part of labour law do you want help with—dismissal, pay, leave, working hours, or something else?',
+      rw:'Ni iki ushaka kumenya ku mategeko agenga umurimo: kwirukanwa, umushahara, ikiruhuko, amasaha y’akazi, cyangwa ikindi?',
+      fr:'Quel sujet du droit du travail souhaitez-vous comprendre : licenciement, salaire, congés, horaires, ou autre chose ?'}[language] || 'Which legal issue would you like me to explain?';
+  }
+  return `${{en:'I found this provision, but could not verify an explanation that answers your question. Here is its exact wording:',
+    rw:'Nabonye iyi ngingo, ariko sinashoboye kwemeza ibisobanuro bisubiza ikibazo cyawe. Dore amagambo yayo:',
+    fr:'J’ai trouvé cette disposition, mais je ne peux pas confirmer une explication répondant à votre question. Voici son texte exact :'}[language] || 'This source passage needs further review.'}\n\n${[selected].map(({doc,body})=>{
     const metadata=lawExcerptMetadata(doc);
     const label=String(metadata?.filename || doc.title).replace(/[\[\]\\\r\n]/g,' ');
-    const body=String(doc.content).split('\n').slice(2).join('\n');
-    const text=body.slice(0,excerpts.length===1 ? 1800 : 700);
-    return `[${label}](${doc.source})\n\n${text.split('\n').map(line=>`> ${line}`).join('\n')}${text.length<body.length ? '\n\n[…]' : ''}`;
-  }).join('\n\n')}`;
+    // Whole sentences/clauses only. Never cut a word or present a fragment as
+    // the complete provision. Keep the link when no compact passage is usable.
+    const units=body.split(/(?<=[.!?;])\s+(?=[\p{Lu}\d(])|\n(?=\s*\d+\s*[º°])/u);
+    const fitting=units.filter(unit=>unit.length>=30 && unit.length<=1200);
+    fitting.sort((a,b)=>score(b)-score(a));
+    const text=body.length<=1400 ? body : fitting[0] || '';
+    const article=doc.articleNumber ? `${language==='rw'?'Ingingo ya':'Article'} ${doc.articleNumber}` : '';
+    return `${article ? `**${article}**\n\n` : ''}${text ? text.split('\n').map(line=>`> ${line}`).join('\n')+'\n\n' : ''}[${label}](${doc.source})`;
+  }).join('\n\n')}\n\n${{en:'This is a passage from the published PDF, not a complete answer. Later amendments and its application to your situation still need checking.',
+    rw:'Iki ni igice cyo muri PDF yatangajwe, si igisubizo cyuzuye. Impinduka zakurikiyeho n’uko bireba ikibazo cyawe biracyakeneye kugenzurwa.',
+    fr:'Il s’agit d’un passage du PDF publié, pas d’une réponse complète. Les modifications ultérieures et son application à votre situation restent à vérifier.'}[language] || ''}`;
 }
 
 const periods=[

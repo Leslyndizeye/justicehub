@@ -5,6 +5,14 @@ import {interpretCasualMessage} from '../shared/chatCasual.js';
 
 const noise=new Set('a an the to of and or in on for is are was were it this that those what how why when which please explain tell me about under law laws article articles no ya mu ni ku kuri iki ki avuga rivuga amategeko itegeko mbwira rwanda rwandan en le la les de des du loi au does do can could should would my your i we have with person people umuntu'.split(' '));
 const hints=[
+  [/\b(?:minimum age|child(?:ren)?|kids?|umwana|abana|enfants?).*(?:work|employ|akazi|gukora|travail)|\b(?:work|employ|akazi|travail).*(?:minimum age|child(?:ren)?|kids?|umwana|abana|enfants?)/i,['minimum','age','admission','employment','child'],'law-66-2018',/minimum age|work for the child|imyaka|umwana|âge|enfant/i],
+  [/\b(?:unpaid|not (?:been )?paid|ntampemba|ntahemb|adahemba)\b/i,['salary','intervals','prescription'],'law-66-2018',/salary|umushahara|salaire/i],
+  [/\b(?:unfair(?:ly)?|unlawful(?:ly)?|wrongful(?:ly)?|without (?:a )?(?:reason|cause)|nta mpamvu|bidakurikije amategeko).*(?:dismiss|fir(?:e|ed)|terminat|kwirukan)|\b(?:dismiss|fir(?:e|ed)|terminat|kwirukan).*(?:unfair|unlawful|wrongful|without|nta mpamvu|bidakurikije)/i,['unlawful','termination','damages'],'law-66-2018'],
+  [/\b(?:fired|sacked|dismiss\w*|terminat\w*|kwirukan\w*|licenci\w*)\b/i,['termination','dismissal'],'law-66-2018'],
+  [/\b(?:notice|integuza|pr[eé]avis)\b/i,['notice','notification'],'law-66-2018',/notice|integuza|pr[eé]avis/i],
+  [/\b(?:severance|terminal benefits|economic reasons|imperekeza)\b/i,['terminal','benefits','economic'],'law-66-2018'],
+  [/\b(?:overtime|working hours|amasaha.*akazi|heures.*travail)\b/i,['working','hours','extra'],'law-66-2018'],
+  [/\b(?:unpaid|salary|wages|umushahara|salaire)\b/i,['salary','payment'],'law-66-2018'],
   [/\b(?:maternity|maternitty|ikiruhuko.*kubyara|kubyara|cong[eé].*maternit[eé])(?=$|[^\p{L}])/iu,['maternity','leave'],'law-66-2018',/maternity|kubyara|maternit[eé]/i],
   [/\b(?:dismissal|dismissed|termination|kwirukanwa|umukoresha|employment|labou?r|akazi)\b/i,['employment'],'law-66-2018'],
   [/\b(?:income tax|umusoro.*nyungu|imp[oô]t.*revenu)\b/i,['income','tax'],'law-27-2022'],
@@ -75,16 +83,27 @@ export function searchLocalLaws(message,history=[],language='en') {
     if(!scope.length && matches<Math.min(2,query.length))continue;
     const heading=record.text.split('\n')[0].toLowerCase();
     for(const word of query)if(heading.includes(word))score+=2*Math.log(1+(records.length-(frequencies.get(word)||0)+.5)/((frequencies.get(word)||0)+.5));
+    // Definitions/scope are background, not the operative rule for every case.
+    // Keep them fully available when the user actually asks about their meaning.
+    const background=/definitions|scope of|purpose of|ibisobanuro|ibirebwa|intego|d[eé]finitions|champ d.application|objet de/i;
+    if(background.test(heading) && !/defin|meaning|mean\b|scope|appl(?:y|ies) to|purpose|bisobanur|ibirebwa|intego|signifi|champ d.application/i.test(text))score*=.18;
+    const definitionRequested=/defin|meaning|mean\b|what is|bisobanur|signifi/i.test(text);
+    const intentPriority=definitionRequested && /definitions|ibisobanuro|d[eé]finitions/i.test(heading) ? 1 : 0;
+    if(/insolven|ubwishyu.*buke/i.test(heading) && !/insolven|bankrupt|ubwishyu.*buke/i.test(text))score*=.25;
     score+=(record.article.language===language?2:record.article.language==='en'?1:0);
     if(articleNumber)score+=30;
-    ranked.push({record,score});
+    ranked.push({record,score,intentPriority});
   }
-  ranked.sort((a,b)=>b.score-a.score);
+  ranked.sort((a,b)=>b.intentPriority-a.intentPriority || b.score-a.score);
   const seen=new Set();const seeds=[];const preferred=[];
   for(const {record} of ranked) {
     const identity=`${record.doc.key}:${record.article.number}`;
     if(seen.has(identity))continue;seen.add(identity);
-    const first=record.article.segments[0];if(!first)continue;
+    // For an oversized article, expansion keeps neighbors of this seed.
+    // Anchor it at the matching clause rather than the beginning of the PDF.
+    const questionWords=tokens(message);
+    const segmentScore=segment=>questionWords.reduce((sum,word)=>sum+(fold(segment.text).includes(word)?1:0),0);
+    const first=[...record.article.segments].sort((a,b)=>segmentScore(b)-segmentScore(a))[0];if(!first)continue;
     seeds.push({title:record.doc.title,year:record.doc.year,category:'legal',source:`${record.doc.archiveSource}#page=${first.page}`,
       content:`[Amategeko PDF: ${record.doc.key}; language: ${record.article.language}; page: ${first.page}; part: ${first.part}; published: ${record.doc.published || 'unknown'}]\nPublished PDF copy.\n${first.text}`});
     preferred.push(record.article.number);

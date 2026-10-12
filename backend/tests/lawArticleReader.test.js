@@ -63,13 +63,13 @@ test('a model draft citing an absent PDF article is withheld; source-reading fal
   const docs=expandLawArticles([seed('law-49-2023',47)],'Explain VAT article 28',{preferredArticles:[28]});
   const events=[];let requests=0;
   const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',searchSetting:'false',
-    client:{chat:{completions:{async create(){requests++;return(async function*(){yield{choices:[{delta:{content:'Article 999 creates an automatic exemption.'}}]};})();}}}}});
+    client:{chat:{completions:{async create(){requests++;return{choices:[{message:{content:JSON.stringify({status:'answered',points:[{kind:'rule',statement:'Article 999 creates an automatic exemption.',evidence:[{source_id:'P1',quote:docs[0].content.split('\n').slice(2).join('\n').slice(0,80),paragraph:null}]}]})}}]};}}}}});
   const reply=await provider.reply({message:'Explain VAT article 28 in English',legalDocs:docs,replyLanguage:'en',streaming:true,
     onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
   assert.equal(requests,1,'No paid or repeated correction request');
   assert.equal(events.join(''),reply);
   assert.doesNotMatch(reply,/automatic exemption|Article 999/);
-  assert.match(reply,/supplied PDF text/);
+  assert.match(reply,/exact wording/);
   assert.match(reply,/LAW ESTABLISHING VALUE ADDED TAX.pdf/);
   assert.deepEqual(unsupportedArticleCitations('Article 28 provides the declaration rule.',docs),[]);
   assert.deepEqual(unsupportedArticleCitations('Article 999 was not provided, so I cannot verify it.',docs),[]);

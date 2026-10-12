@@ -28,6 +28,10 @@ export function authErrorMessage(error, action = 'login') {
       return 'Sign-in was cancelled. Please try again when you are ready.';
     case 'auth/account-exists-with-different-credential':
       return 'Use the sign-in method you originally chose for this email.';
+    case 'auth/unauthorized-domain':
+    case 'auth/operation-not-allowed':
+    case 'auth/configuration-not-found':
+      return 'This sign-in option is temporarily unavailable. Try your email and password, or contact support.';
     case 'auth/expired-action-code':
     case 'auth/invalid-action-code':
       return 'This reset link has expired or is invalid. Please request a new one.';
