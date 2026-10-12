@@ -16,6 +16,7 @@ import './chatGlass.css';
 import { createAnswerReader } from '../lib/answerReader.js';
 import ReadAloudButton from './ReadAloudButton';
 import { StatusPanel } from './StatusScreen';
+import DeleteConversationDialog from './DeleteConversationDialog';
 import { recoveryState, requestError } from '../lib/recoveryState.js';
 
 const API = apiBaseUrl(import.meta.env.VITE_API_URL, import.meta.env.DEV);
@@ -84,6 +85,10 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
   const sessionsRequest = useRef(0);
   const [rainActive, setRainActive] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<ChatSession | null>(null);
+  const [deletingSession, setDeletingSession] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const deleteRequestPending = useRef(false);
   const historyPanelRef = useRef<HTMLElement>(null);
   const historyToggleRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -102,7 +107,9 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
       historyPanelRef.current?.getBoundingClientRect();
       historyPanelRef.current?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
     });
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setHistoryOpen(false); };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !(event.target instanceof Element && event.target.closest('dialog[open]'))) setHistoryOpen(false);
+    };
     const desktop = window.matchMedia('(min-width: 960px)');
     const closeOnDesktop = () => { if (desktop.matches) setHistoryOpen(false); };
     document.addEventListener('keydown', closeOnEscape);
@@ -330,17 +337,30 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
     navigate(conversationPath(sessionId));
   };
 
-  const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!window.confirm('Delete this consultation? This cannot be undone.')) return;
+  const cancelDelete = () => {
+    if (deleteRequestPending.current) return;
+    setSessionToDelete(null);
+    setDeleteError('');
+  };
+
+  const deleteSession = async () => {
+    if (!sessionToDelete || deleteRequestPending.current) return;
+    const sessionId = sessionToDelete.id;
+    deleteRequestPending.current = true;
+    setDeletingSession(true);
+    setDeleteError('');
     try {
       const response = await fetch(`${API}/api/sessions/${sessionId}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Conversation could not be deleted.');
       if (activeSessionId === sessionId) startNewChat();
       sessionsRef.current = sessionsRef.current.filter(s => s.id !== sessionId);
       setSessions(sessionsRef.current);
-    } catch (err) {
-      console.error('Delete failed:', err);
+      setSessionToDelete(null);
+    } catch {
+      setDeleteError('We couldn’t delete this conversation. Please try again.');
+    } finally {
+      deleteRequestPending.current = false;
+      setDeletingSession(false);
     }
   };
 
@@ -542,7 +562,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
               <button type="button" onClick={() => selectSession(s.id)} className="chat-session-link" aria-current={activeSessionId === s.id ? 'page' : undefined} title={s.title}>
                 <MessageSquare size={17} strokeWidth={1.7} aria-hidden="true" /><span>{s.title}</span>
               </button>
-              <button type="button" onClick={e => deleteSession(s.id, e)} className="chat-session-delete" title="Delete conversation" aria-label={`Delete ${s.title}`}>
+              <button type="button" onClick={() => { setDeleteError(''); setSessionToDelete(s); }} className="chat-session-delete" title="Delete conversation" aria-label={`Delete ${s.title}`}>
                 <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
               </button>
             </div>
@@ -603,6 +623,8 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
           </div>}
         </div>}
       </main>
+      {sessionToDelete && <DeleteConversationDialog title={sessionToDelete.title} busy={deletingSession} error={deleteError}
+        onCancel={cancelDelete} onConfirm={() => void deleteSession()} />}
     </div>
   );
 };
