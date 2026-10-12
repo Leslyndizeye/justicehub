@@ -2,6 +2,7 @@
 export const legalRetrievalCases=[
   ['Constitution equality','What does the constitution say about equality?','constitution-2023',15,'en'],
   ['Income tax article','Explain Law No. 027/2022 article 12','law-27-2022',12,'en'],
+  ['Screenshot income-tax exemptions','what are Payments exempted from employment income tax','law-27-2022',16,'en'],
   ['VAT joined typing','amategeko avuga ku ki kumusorowinyongerera gaciro ?','law-49-2023',4,'rw'],
   ['VAT declaration','Nk’uko VAT ibivuga mu ngingo ya 28, imenyekanisha rikorwa ryari?','law-49-2023',28,'rw'],
   ['Court jurisdiction','Explain Law No. 30/2018 article 9','law-30-2018',9,'en'],

@@ -27,6 +27,7 @@ export function rateLimitDeadline(error, time = Date.now()) {
 /** Display actionable text rather than raw network or provider exceptions. */
 export function chatFailureNotice(error, language = 'en') {
   if (error?.status === 429 && error?.retryAfterSeconds > 0) return rateLimitNotice(error.retryAfterSeconds, language);
+  if(error?.status===413)return ({en:'This request is too large to answer at once. Try a shorter question or a new conversation.',rw:'Iki kibazo ni kirekire cyane ngo gisubizwe icyarimwe. Gerageza ikibazo kigufi cyangwa utangire ikiganiro gishya.',fr:'Cette demande est trop longue pour une seule réponse. Essayez une question plus courte ou une nouvelle conversation.'})[language] || 'Try a shorter question or a new conversation.';
   const signIn = error?.status === 401;
   if (language === 'rw') return signIn ? 'Ongera winjire kuri konti yawe, hanyuma wongere ugerageze.' : 'Igisubizo nticyarangiye. Ongera ugerageze mu kanya.';
   if (language === 'fr') return signIn ? 'Reconnectez-vous à votre compte, puis réessayez.' : 'La réponse n’a pas pu être terminée. Réessayez dans un moment.';

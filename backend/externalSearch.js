@@ -92,6 +92,7 @@ export function externalSearchNotice(result, language) {
   })[language] || `Using search results saved at ${date}; this is not a new live verification.\n\n`;
   const reason = result.status === 'unconfigured' ? 'missing_key' : result.reason || result.status;
   const descriptions = {
+    context_size: ['Ibice by’ishakisha ntibyashoboye kujya byose muri iki gisubizo.', 'Les extraits de recherche ne pouvaient pas tenir dans cette réponse.', 'The web excerpts could not fit in this answer’s context.'],
     missing_key: ['Tavily ntirashyirwamo urufunguzo.', 'La clé Tavily n’est pas configurée.', 'The Tavily search key is not configured.'],
     quota: ['Ingano y’ishakisha ry’ubuntu yarangiye.', 'Le quota de recherche gratuit est épuisé.', 'The free search allowance is exhausted.'],
     plan: ['Igenzura rya konti y’ubuntu ntiryemeje ishakisha.', 'Le contrôle du compte gratuit n’a pas autorisé la recherche.', 'The free-account check did not permit search.'],

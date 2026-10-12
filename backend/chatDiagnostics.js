@@ -1,6 +1,6 @@
 const networkCodes = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET']);
 const errorTypes = new Set(['Error', 'TypeError', 'ReferenceError', 'SyntaxError', 'AbortError', 'TimeoutError', 'APIError', 'APIConnectionError', 'APIConnectionTimeoutError', 'APIUserAbortError', 'AuthenticationError', 'PermissionDeniedError', 'RateLimitError', 'InternalServerError', 'BadRequestError', 'NotFoundError']);
-const knownCodes = new Set(['rate_limit_exceeded', 'model_not_found', 'tool_use_failed', 'context_length_exceeded', 'empty_model_response', 'translation_protected_value_changed', 'translation_empty', 'translation_wrong_language', 'request_timeout', 'provider_connection_failed', 'provider_unavailable']);
+const knownCodes = new Set(['rate_limit_exceeded', 'request_too_large', 'json_validate_failed', 'model_not_found', 'tool_use_failed', 'context_length_exceeded', 'empty_model_response', 'translation_protected_value_changed', 'translation_empty', 'translation_wrong_language', 'request_timeout', 'provider_connection_failed', 'provider_unavailable']);
 const stages = new Set(['create_session', 'load_session', 'load_history', 'save_user', 'legal_retrieval', 'generate', 'answer', 'translation', 'save_reply', 'update_session']);
 
 function errorType(error) {
@@ -27,7 +27,7 @@ export function providerFailure(error, timedOut = false) {
 // details, keys, arbitrary error messages, or full filesystem paths.
 export function chatErrorDiagnostic(error, stage = 'generate') {
   const type = errorType(error);
-  const rawCode = error?.error?.error?.code || error?.error?.code || error?.code;
+  const rawCode = error?.status===413 ? 'request_too_large' : error?.error?.error?.code || error?.error?.code || error?.code;
   const failure = error?.chatFailure || providerFailure(error);
   const phase = error?.chatPhase || stage;
   const frame = typeof error?.stack === 'string' ? error.stack.match(/(?:[\\/])((?:chatProvider|chatTranslation|searchFallback|chatPrompt|externalSearch|server|legalQuestion|chatLanguage)\.js:\d+:\d+)/)?.[1] : undefined;
