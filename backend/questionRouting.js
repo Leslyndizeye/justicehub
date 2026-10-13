@@ -8,6 +8,9 @@ const legalWords = /\b(?:laws?|legal|legally|illegal|rights?|responsibilit\w*|co
 const social = /^(?:hello|hi|hey+|yoo+|muraho|mwiriwe|mwaramutse|thanks|thank you|murakoze|bonjour|salut|merci|who are you|what (?:is your purpose|can you do|do you like to eat)|my name is .+|nitwa .+|what is my name|what do you remember about me|remember .+|forget .+)[\s.!?]*$/i;
 const unrelated = /\b(?:yog(?:h|o|oh)?urt|recipes?|cook\w*|meal|food|hungry|football|soccer|sports?|match score|celebrit\w*|weather|horoscope|video games?|python|javascript|programming|coding|bitcoin price)\b|\b(?:i (?:want|need|like) (?:to eat|to drink|pizza|milk|coffee|tea)|latest news)\b|\b(?:ndashaka|nkunda)\s+(?:kurya|kunywa|yawurute)|\b(?:recette|cuisin\w*|yaourt)\b/i;
 const followup = /^(?:(?:and |but |so )?(?:why|how|what about (?:that|this|it|now|children)|is that (?:legal|allowed|right)|explain (?:it|that|more)|tell me more|in (?:english|french|kinyarwanda)|answer in (?:english|french|kinyarwanda)|what (?:is|about) the (?:penalty|punishment)|how much|how long|what next)|sobanura(?: neza)?|ahanishwa iki|mu cyongereza|en francais)[\s.!?]*$/i;
+const onlineFollowup = /^(?:please\s+)?(?:(?:can|could|would) you\s+)?(?:search(?:\s+(?:it|that))?\s+(?:online|(?:the )?web|(?:on(?: the)?|the) internet)|look (?:it|that) up(?: online)?|check(?: (?:it|that))? (?:online|on(?: the)? internet)|do a web search|browse(?: the web)?|(?:shakisha|washakisha) kuri (?:internet|interineti)|recherche sur internet|cherche en ligne|peux-tu chercher en ligne)(?:\s+(?:please|again|instead|for (?:it|that|this)))?[\s.!?]*$/i;
+export const requestsOnlineSearch = message => onlineFollowup.test(fold(message))
+  || /\b(?:search|check|verify|look up|shakisha|chercher|rechercher)\b.{0,80}\b(?:online|internet|interineti|web|en ligne)\b/i.test(fold(message));
 
 // This is a conservative routing gate, not a finding that an offence occurred.
 // An unclear request gets context before retrieval; a mere possible legal angle
@@ -16,14 +19,16 @@ export function questionRoute(message, history = []) {
   const text = fold(message);
   if (interpretCasualMessage(message)?.standalone || social.test(text)) return { kind: 'social' };
   if (/\b(?:suicid\w*|kill myself|hurt myself|can't breathe|cannot breathe|medical emergency|in immediate danger)\b/i.test(text)) return { kind: 'safety' };
-  if (/\b(?:children|child|kids?|umwana|abana|enfant).*(?:work|akazi|gukora|travail)|\b(?:work|akazi|travail).*(?:children|child|kids?|umwana|abana|enfant)|\b(?:jimmy mcgill|saul goodman|better call saul)|\b(?:paid|bought).*(?:never|not|didn't|refus).*(?:deliver|receive|refund)|\b(?:minimum age).*(?:work|employ)/i.test(text)) return { kind: 'legal' };
-  if (legalWords.test(text) || matchedLegalVocabulary(message).some(entry => entry.topic) || vatQuestion(message)) return { kind: 'legal' };
+  if (/\b(?:children|child|kids?|umwana|abana|enfant).*(?:work|akazi|gukora|travail)|\b(?:work|akazi|travail).*(?:children|child|kids?|umwana|abana|enfant)|\b(?:jimmy mcgill|saul goodman|better call saul)|\b(?:paid|bought).*(?:never|not|didn't|refus).*(?:deliver|receive|refund)|\b(?:minimum age).*(?:work|employ)/i.test(text)) return { kind: 'legal', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
+  if (legalWords.test(text) || matchedLegalVocabulary(message).some(entry => entry.topic) || vatQuestion(message)) return { kind: 'legal', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
   if (unrelated.test(text)) return { kind: 'unrelated' };
-  if (followup.test(text) || isCorrectionRequest(message)) {
+  if (followup.test(text) || onlineFollowup.test(text) || isCorrectionRequest(message)) {
     // Only user context can establish a topic. A previous erroneous assistant
     // PDF citation must never make the next message a legal request.
-    const previous = [...history].reverse().find(item => item.sender === 'user' && typeof item.content === 'string' && !followup.test(fold(item.content)) && !isCorrectionRequest(item.content));
-    if (previous && questionRoute(previous.content).kind === 'legal') return { kind: 'legal', context: previous.content };
+    const previous = [...history].reverse().find(item => item.sender === 'user' && typeof item.content === 'string' && !followup.test(fold(item.content)) && !onlineFollowup.test(fold(item.content)) && !isCorrectionRequest(item.content));
+    const earlierRoute = previous && questionRoute(previous.content);
+    if (earlierRoute?.kind === 'legal') return { kind: 'legal', context: previous.content, ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
+    if (onlineFollowup.test(text) && earlierRoute?.kind === 'unrelated') return { kind: 'unrelated' };
   }
   return { kind: 'unclear' };
 }

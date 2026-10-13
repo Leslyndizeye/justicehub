@@ -131,10 +131,10 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       const pdfFirst = (legalDocs || []).some(doc => doc.coverage && lawExcerptMetadata(doc));
       // A dated PDF cannot establish today's law or a later amendment.
       const currentVerification = /\b(?:latest|current|today|now|in force|still appl\w*|202[5-9]|new laws?|amend\w*|updated?|recent|agezweho|mashya|vuba|aujourd'hui|actuel\w*|modifi\w*|recent\w*)\b/i.test(message);
-      let needsResearch = route.kind === 'legal' && (!pdfFirst || currentVerification);
-      const referencedAnswer = incomeTaxExemptionsAnswer(message, legalDocs, language)
+      let needsResearch = route.kind === 'legal' && (!pdfFirst || currentVerification || route.forceWeb);
+      const referencedAnswer = !route.forceWeb && (incomeTaxExemptionsAnswer(message, legalDocs, language)
         || vatOverviewAnswer(message, legalDocs, language)
-        || referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language);
+        || referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language));
       if (referencedAnswer) {
         if (streaming) onEvent('token', { text: referencedAnswer });
         return referencedAnswer;

@@ -140,3 +140,62 @@ test('unclear questions ask for context without selecting a PDF or offering a br
   }) });
   assert.match(await provider.reply({ message, legalDocs: docs, replyLanguage: 'en' }), /Which legal issue/);
 });
+
+test('online follow-ups retain the latest user legal topic across repeated requests, including local languages', () => {
+  const history = [{ sender: 'user', content: 'Can I get a refund for expired yoghurt?' },
+    { sender: 'ai', content: 'Article 14 of the VAT law concerns foreign services.' },
+    { sender: 'user', content: 'can you search online?' }];
+  for (const message of ['can you search online ?', 'Please search online again', 'could you look it up online?',
+    'can you check online?', 'can you search the internet?', 'shakisha kuri internet', 'shakisha kuri interineti', 'peux-tu chercher en ligne ?']) {
+    const route = questionRoute(message, history);
+    assert.equal(route.kind, 'legal', message); assert.equal(route.forceWeb, true, message);
+    assert.equal(route.context, history[0].content);
+    const plan = publicSearchPlan(message, history);
+    assert.match(plan.query, /consumer protection/); assert.doesNotMatch(plan.query, /VAT|foreign|Article 14/);
+  }
+  const personal = [{ sender: 'user', content: 'My client Aniela was scammed. Her phone is 250788123456. What rights does she have?' }];
+  assert.doesNotMatch(publicSearchPlan('can you search online?', personal).query, /Aniela|250788|client/);
+});
+
+test('the screenshot search follow-up performs a lookup even when the PDFs already support an answer', async () => {
+  const order = []; const history = [{ sender: 'user', content: question }, { sender: 'ai', content: 'An unrelated tax article.' }];
+  const message = 'can you search online ?';
+  const legalDocs = await searchLegalDocs({ from() { throw new Error('Local PDF is present'); } }, message, history, 'en', {
+    localSearch(text) { order.push('pdf'); assert.ok(text.includes(question)); return docs; },
+  });
+  const provider = createChatProvider({ model: 'openai/gpt-oss-120b', externalSearch: { async lookup(input) {
+    order.push('web'); assert.match(publicSearchPlan(input.message, input.history).query, /employment labour/); return research;
+  } }, client: client(async request => {
+    order.push('draft'); assert.match(request.messages[0].content, /ONLINE SEARCH FOLLOW-UP/);
+    assert.ok(request.messages[0].content.includes(question));
+    assert.match(request.messages[0].content, /BACKEND WEB RESEARCH/);
+    return completion(sourceAnswer);
+  }) });
+  const reply = await provider.reply({ message, history, legalDocs, replyLanguage: 'en' });
+  assert.deepEqual(order, ['pdf', 'web', 'draft']); assert.match(reply, /sixteen years/);
+  assert.doesNotMatch(reply, /Which legal issue/);
+});
+
+test('an earlier wrong assistant article does not authorize searching an unrelated topic; a missing topic gets clarification', async () => {
+  const never = () => { throw new Error('Do not research unrelated food'); };
+  const history = [{ sender: 'user', content: 'i want yogohurt' }, { sender: 'ai', content: 'Law No. 049/2023 Article 14' }];
+  const message = 'can you search online?';
+  assert.equal(questionRoute(message, history).kind, 'unrelated');
+  assert.deepEqual(await searchLegalDocs({ from: never }, message, history, 'en', { localSearch: never }), []);
+  assert.equal(publicSearchPlan(message, history), null);
+  const provider = createChatProvider({ model: 'openai/gpt-oss-120b', client: client(never), externalSearch: { lookup: never } });
+  assert.equal(await provider.reply({ message, history, legalDocs: docs, replyLanguage: 'en' }), scopeReply('en'));
+  assert.equal(questionRoute(message).kind, 'unclear');
+  assert.equal(publicSearchPlan(message), null);
+});
+
+test('an explicit online request bypasses a reviewed canned PDF answer, and Stop cancels the answer after lookup', async () => {
+  let lookups = 0; let drafts = 0;
+  const controller = new AbortController();
+  const provider = createChatProvider({ model: 'openai/gpt-oss-120b', externalSearch: { async lookup() {
+    lookups++; controller.abort(); return research;
+  } }, client: client(async () => { drafts++; throw new Error('No draft after Stop'); }) });
+  await assert.rejects(provider.reply({ message: 'umuntu wibye ahanishwa iki? please search online', history: [],
+    legalDocs: [], replyLanguage: 'en', signal: controller.signal }), { name: 'AbortError' });
+  assert.equal(lookups, 1); assert.equal(drafts, 0);
+});
