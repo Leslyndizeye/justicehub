@@ -41,9 +41,9 @@ export function sourceReadingReply(excerpts, language, question='') {
       rw:'Ni iki ushaka kumenya ku mategeko agenga umurimo: kwirukanwa, umushahara, ikiruhuko, amasaha y’akazi, cyangwa ikindi?',
       fr:'Quel sujet du droit du travail souhaitez-vous comprendre : licenciement, salaire, congés, horaires, ou autre chose ?'}[language] || 'Which legal issue would you like me to explain?';
   }
-  return `${{en:'I found this provision, but could not verify an explanation that answers your question. Here is its exact wording:',
-    rw:'Nabonye iyi ngingo, ariko sinashoboye kwemeza ibisobanuro bisubiza ikibazo cyawe. Dore amagambo yayo:',
-    fr:'J’ai trouvé cette disposition, mais je ne peux pas confirmer une explication répondant à votre question. Voici son texte exact :'}[language] || 'This source passage needs further review.'}\n\n${[selected].map(({doc,body})=>{
+  return `${{en:'Here is the exact wording from the relevant PDF passage:',
+    rw:'Dore amagambo y’umwimerere yo muri iki gice cya PDF:',
+    fr:'Voici le texte exact du passage PDF pertinent :'}[language] || 'The PDF passage states:'}\n\n${[selected].map(({doc,body})=>{
     const metadata=lawExcerptMetadata(doc);
     const label=String(metadata?.filename || doc.title).replace(/[\[\]\\\r\n]/g,' ');
     // Whole sentences/clauses only. Never cut a word or present a fragment as
@@ -54,9 +54,9 @@ export function sourceReadingReply(excerpts, language, question='') {
     const text=body.length<=1400 ? body : fitting[0] || '';
     const article=doc.articleNumber ? `${language==='rw'?'Ingingo ya':'Article'} ${doc.articleNumber}` : '';
     return `${article ? `**${article}**\n\n` : ''}${text ? text.split('\n').map(line=>`> ${line}`).join('\n')+'\n\n' : ''}[${label}](${doc.source})`;
-  }).join('\n\n')}\n\n${{en:'This is a passage from the published PDF, not a complete answer. Later amendments and its application to your situation still need checking.',
-    rw:'Iki ni igice cyo muri PDF yatangajwe, si igisubizo cyuzuye. Impinduka zakurikiyeho n’uko bireba ikibazo cyawe biracyakeneye kugenzurwa.',
-    fr:'Il s’agit d’un passage du PDF publié, pas d’une réponse complète. Les modifications ultérieures et son application à votre situation restent à vérifier.'}[language] || ''}`;
+  }).join('\n\n')}\n\n${{en:'This quotes the published source. A supported explanation for your question was not produced; later changes are not covered here.',
+    rw:'Aya ni amagambo yo mu nyandiko yatangajwe. Nta bisobanuro by’ikibazo cyawe bishingiye ku masoko byatanzwe; impinduka zakurikiyeho ntizirebwa hano.',
+    fr:'Il s’agit du texte publié. Une explication étayée répondant à votre question n’a pas été produite ; les modifications ultérieures ne sont pas couvertes.'}[language] || ''}`;
 }
 
 const periods=[

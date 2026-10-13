@@ -2,6 +2,7 @@ import { interpretCasualMessage } from '../shared/chatCasual.js';
 import { matchedLegalVocabulary } from './legalVocabulary.js';
 import { vatQuestion } from './legalTaxTopic.js';
 import { isCorrectionRequest } from './chatCorrection.js';
+import { employmentAgeQuestion } from './employmentAgeTopic.js';
 
 const fold = text => String(text || '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
 const legalWords = /\b(?:laws?|legal|legally|illegal|rights?|responsibilit\w*|courts?|judges?|lawyers?|advocates?|attorneys?|justice|constitution|contracts?|agreements?|tax\w*|paye|vat|tva|income|employment|employers?|employees?|labou?r|salary|wages?|dismiss\w*|fired|severance|overtime|maternity|maternitty|termination|apprentice|tenan\w*|landlord|rent\w*|evict\w*|deposit|land|property|ownership|inherit\w*|divorc\w*|marriage|custody|child support|fraud|scam\w*|theft|steal\w*|stolen|robbery|rape|assault|threat\w*|harass\w*|abuse|consent|discriminat\w*|arrest\w*|bail|prison|sentenc\w*|penalt\w*|punish\w*|prohibit\w*|evidence|summon\w*|appeal\w*|lawsuit|complaint|licen[cs]\w*|permit|authoris\w*|authoriz\w*|privacy|data protection|cybercrime|hacking|phishing|copyright|trademark|refund|consumer|compensation|damages|defence|defense|crime|criminal|offence|offense|police|rib|parliament|bar association|bar internal|amategeko|itegeko|tegeko|ingingo|uburenganzira|inshingano|icyaha|ibyaha|ibihano|igihano|umusoro|imisoro|akazi|umukozi|umukoresha|umushahara|kwirukan\w*|ubutaka|amasezerano|ubukode|ubujura|gutubur\w*|gufata\s*ku\s*ngufu|uburiganya|ubwicanyi|ahanish\w*|urukiko|inkiko|ikirego|avoka|kubyara|lois?|juridique|droits?|avocats?|tribunal|impots?|emploi|travail|salaire|licenci\w*|locataire|bailleur|contrat|divorce|plainte|peine|vol|viol|escroquer\w*|autorisation)\b/i;
@@ -28,6 +29,7 @@ export function questionRoute(message, history = []) {
   const previousUser = [...history].reverse().find(turn => turn.sender === 'user' && typeof turn.content === 'string');
   if (fictionalTopic.test(text) || (previousUser && fictionalTopic.test(fold(previousUser.content))
     && /\b(?:he|him|his|character|show|series|story)\b/i.test(text))) return { kind: 'unclear' };
+  if (employmentAgeQuestion(message)) return { kind: 'legal', researchTopic: 'employment labour child minimum age', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
   if (/\b(?:children|child|kids?|umwana|abana|enfant).*(?:work|akazi|gukora|travail)|\b(?:work|akazi|travail).*(?:children|child|kids?|umwana|abana|enfant)|\b(?:paid|bought).*(?:never|not|didn't|refus).*(?:deliver|receive|refund)|\b(?:minimum age).*(?:work|employ)/i.test(text)) return { kind: 'legal', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
   if (legalWords.test(text) || matchedLegalVocabulary(message).some(entry => entry.topic) || vatQuestion(message)) return { kind: 'legal', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
   // Intercept only clear off-topic requests. A sentence mentioning food or

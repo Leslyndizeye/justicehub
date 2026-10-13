@@ -2,9 +2,11 @@ import catalog from './data/amategekoCatalog.json' with {type:'json'};
 import {readLawArticles,expandLawArticles} from './lawArticleReader.js';
 import {interpretLegalQuestion} from './legalQuestion.js';
 import {interpretCasualMessage} from '../shared/chatCasual.js';
+import {employmentAgeQuestion} from './employmentAgeTopic.js';
 
 const noise=new Set('a an the to of and or in on for is are was were it this that those what how why when which please explain tell me about under law laws article articles no ya mu ni ku kuri iki ki avuga rivuga amategeko itegeko mbwira rwanda rwandan en le la les de des du loi au does do can could should would my your i we have with person people umuntu'.split(' '));
 const hints=[
+  [{test:employmentAgeQuestion},['minimum','age','admission','employment','child'],'law-66-2018'],
   [/\b(?:minimum age|child(?:ren)?|kids?|umwana|abana|enfants?).*(?:work|employ|akazi|gukora|travail)|\b(?:work|employ|akazi|travail).*(?:minimum age|child(?:ren)?|kids?|umwana|abana|enfants?)/i,['minimum','age','admission','employment','child'],'law-66-2018',/minimum age|work for the child|imyaka|umwana|âge|enfant/i],
   [/\b(?:unpaid|not (?:been )?paid|ntampemba|ntahemb|adahemba)\b/i,['salary','intervals','prescription'],'law-66-2018',/salary|umushahara|salaire/i],
   [/\b(?:unfair(?:ly)?|unlawful(?:ly)?|wrongful(?:ly)?|without (?:a )?(?:reason|cause)|nta mpamvu|bidakurikije amategeko).*(?:dismiss|fir(?:e|ed)|terminat|kwirukan)|\b(?:dismiss|fir(?:e|ed)|terminat|kwirukan).*(?:unfair|unlawful|wrongful|without|nta mpamvu|bidakurikije)/i,['unlawful','termination','damages'],'law-66-2018'],
@@ -62,6 +64,7 @@ export function searchLocalLaws(message,history=[],language='en') {
   if(!legalIntent)return [];
   const explicitKey=named && `law-${Number(named[1])}-${named[2]}`;
   const articleNumber=text.match(/\b(?:article|i?ngingo\s*(?:ya)?)\s*(\d{1,3})\b/i)?.[1];
+  const focusAge = employmentAgeQuestion(text) && !articleNumber && !explicitKey;
   const scope=explicitKey ? [explicitKey] : selected.map(item=>item[2]);
   const interpretation=interpretLegalQuestion(message,history);
   if(interpretation.topic && !scope.length)return [];
@@ -70,6 +73,7 @@ export function searchLocalLaws(message,history=[],language='en') {
   const {records,frequencies,averageLength}=searchIndex();
   const ranked=[];
   for(const record of records) {
+    if(focusAge && (record.doc.key!=='law-66-2018' || ![5,6].includes(record.article.number)))continue;
     if(scope.length && !scope.includes(record.doc.key))continue;
     if(selected[0]?.[3] && !selected[0][3].test(record.text))continue;
     if(articleNumber && record.article.number!==Number(articleNumber))continue;
@@ -94,7 +98,7 @@ export function searchLocalLaws(message,history=[],language='en') {
     if(articleNumber)score+=30;
     ranked.push({record,score,intentPriority});
   }
-  ranked.sort((a,b)=>b.intentPriority-a.intentPriority || b.score-a.score);
+  ranked.sort((a,b)=>(focusAge ? a.record.article.number-b.record.article.number : 0) || b.intentPriority-a.intentPriority || b.score-a.score);
   const seen=new Set();const seeds=[];const preferred=[];
   for(const {record} of ranked) {
     const identity=`${record.doc.key}:${record.article.number}`;

@@ -44,6 +44,7 @@ Each legal point MUST be supported by a contiguous verbatim quotation from that 
 For numbered paragraphs or items provide the actual number containing the quote, otherwise null. Paragraph (4) of Article 28 is Article 28(4), not Article 4. Do not add citation URLs to statements; the application creates them from validated source IDs.
 Read the quote's conditions, exceptions, thresholds, periods and negation BEFORE interpreting it. Rule numbers must occur in the supporting quotes. Application points may also use facts explicitly provided by the user; label the conclusion as conditional, not a judicial decision. Do not add uncited filing/application steps, assume a tax exemption is 0%, convert quarters into weeks, or invent calculations. Distinguish dated PDFs from verified current law.
 Keep each person's qualification distinct. For example, an exemption requiring both a non-resident employee and a non-resident employer must mention both; the employer's residence alone does not qualify every employee. Preserve listed subconditions without inventing an "or" or an "and" when the text leaves their relationship unclear.
+State rules established by the source directly: "Article 5 sets...", not "I think", "perhaps" or "I cannot verify" when that wording is supplied. Limit uncertainty to a specific missing fact, incomplete source or unverified later change; never claim a current-law check or a case outcome that the evidence does not establish.
 If the sources do not support the requested answer, return status "insufficient" with an empty points array. Do not hide unsupported advice in any other field. An incomplete article or a search snippet cannot establish an exhaustive list or a precise new legal requirement.`;
 
 export function evidenceRepairInstruction(reason) {
@@ -150,9 +151,9 @@ export function renderEvidenceAnswer(result,language) {
     if(!links.has(base))links.set(base,{label:cleanLabel(source.metadata?.filename || source.doc.title),url});
   }
   const label={en:'Sources',rw:'Inkomoko',fr:'Sources'}[language]||'Sources';
-  const qualification={en:'The PDF provisions are published versions. Later amendments and case-specific applicability still need verification.',
-    rw:'Ingingo za PDF ni izo mu nyandiko zatangajwe. Impinduka zakurikiyeho n’uko zireba ikibazo cyawe biracyakeneye kugenzurwa.',
-    fr:'Les dispositions PDF proviennent de versions publiées. Les modifications ultérieures et leur application à votre cas restent à vérifier.'}[language]||'';
+  const qualification={en:'Based on the cited published PDF version. Later amendments are outside this explanation.',
+    rw:'Bishingiye ku nyandiko ya PDF yatangajwe yavuzwe hano. Impinduka zakurikiyeho ntizirebwa n’ibi bisobanuro.',
+    fr:'Cette explication repose sur la version PDF publiée citée. Les modifications ultérieures ne sont pas couvertes.'}[language]||'';
   const partial=[...used.values()].some(source=>source.doc.coverage==='partial_article');
   const partialNotice={en:'Only part of at least one article was supplied; its complete conditions and exceptions have not been checked.',
     rw:'Nibura ingingo imwe yatanzwe igice; ibisabwa n’ibidasanzwe byose biyikubiyemo ntibyagenzuwe.',fr:'Au moins un article n’a été fourni qu’en partie ; toutes ses conditions et exceptions n’ont pas été vérifiées.'}[language]||'';

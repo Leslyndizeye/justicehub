@@ -19,6 +19,7 @@ import {evidenceResponseFormat,validateEvidenceAnswer,renderEvidenceAnswer} from
 import {prepareEvidenceRequest} from './evidenceRequest.js';
 import { questionRoute, scopeReply, insufficientSourcesReply } from './questionRouting.js';
 import { inferQuestionRoute } from './questionUnderstanding.js';
+import { employmentAgeAnswer } from './employmentAgeAnswer.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -154,7 +155,8 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       // A dated PDF cannot establish today's law or a later amendment.
       const currentVerification = /\b(?:latest|current|today|now|in force|still appl\w*|202[5-9]|new laws?|amend\w*|updated?|recent|agezweho|mashya|vuba|aujourd'hui|actuel\w*|modifi\w*|recent\w*)\b/i.test(message);
       let needsResearch = route.kind === 'legal' && (!pdfFirst || currentVerification || route.forceWeb);
-      const referencedAnswer = !route.forceWeb && (incomeTaxExemptionsAnswer(message, legalDocs, language)
+      const referencedAnswer = !route.forceWeb && (employmentAgeAnswer(message, legalDocs, language)
+        || incomeTaxExemptionsAnswer(message, legalDocs, language)
         || vatOverviewAnswer(message, legalDocs, language)
         || referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language));
       if (referencedAnswer) {
