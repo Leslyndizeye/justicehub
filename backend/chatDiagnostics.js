@@ -1,7 +1,7 @@
 const networkCodes = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET']);
 const errorTypes = new Set(['Error', 'TypeError', 'ReferenceError', 'SyntaxError', 'AbortError', 'TimeoutError', 'APIError', 'APIConnectionError', 'APIConnectionTimeoutError', 'APIUserAbortError', 'AuthenticationError', 'PermissionDeniedError', 'RateLimitError', 'InternalServerError', 'BadRequestError', 'NotFoundError']);
 const knownCodes = new Set(['rate_limit_exceeded', 'request_too_large', 'json_validate_failed', 'model_not_found', 'tool_use_failed', 'context_length_exceeded', 'empty_model_response', 'translation_protected_value_changed', 'translation_empty', 'translation_wrong_language', 'request_timeout', 'provider_connection_failed', 'provider_unavailable']);
-const stages = new Set(['create_session', 'load_session', 'load_history', 'save_user', 'legal_retrieval', 'generate', 'answer', 'translation', 'save_reply', 'update_session']);
+const stages = new Set(['create_session', 'load_session', 'load_history', 'save_user', 'understand_question', 'legal_retrieval', 'generate', 'answer', 'translation', 'save_reply', 'update_session']);
 
 function errorType(error) {
   const constructor = error?.constructor?.name;

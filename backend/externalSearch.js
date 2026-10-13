@@ -17,8 +17,8 @@ const topics = [
 ];
 
 /** Never send a client's account/name/case description to the search provider. */
-export function publicSearchPlan(message, history = []) {
-  const route = questionRoute(message, history);
+export function publicSearchPlan(message, history = [], routing) {
+  const route = routing || questionRoute(message, history);
   if (route.kind !== 'legal') return null;
   if (route.context) message = `${route.context}\n${message}`;
   if (interpretCasualMessage(message)?.standalone) return null;
@@ -26,8 +26,8 @@ export function publicSearchPlan(message, history = []) {
   if (/\b(?:your purpose|my name|remember about me|izina ryanjye|uranyibuka)\b/i.test(message)) return null;
   const interpretation = interpretLegalQuestion(message, history);
   const vat = vatQuestion(message, history);
-  if (vat) return {query:`Rwanda value added tax VAT law 049/2023 amendments${vat.article ? ` article ${vat.article}` : ''}`, legal:true, legalTopic:'vat', topic:'general'};
-  let topic = interpretation.topics.join(' ').replaceAll('_', ' ');
+  if (vat || route.researchTopic === 'value added tax VAT') return {query:`Rwanda value added tax VAT law 049/2023 amendments${vat?.article ? ` article ${vat.article}` : ''}`, legal:true, legalTopic:'vat', topic:'general'};
+  let topic = route.researchTopic || interpretation.topics.join(' ').replaceAll('_', ' ');
   if (!topic) topic = topics.find(([pattern]) => pattern.test(message))?.[1] || '';
   // A short current-law follow-up can refer to the latest user topic.
   if (!topic && currentWords.test(message) && message.length < 120) {

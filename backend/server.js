@@ -333,9 +333,12 @@ app.post('/api/chat', async (req, res) => {
     });
     if (userMessageErr) throw userMessageErr;
 
+    // Understand indirect wording and context before selecting any sources.
+    chatStage = 'understand_question';
+    const routing = await chatProvider.understand({ message, history, signal: generation.signal });
     // Build conversational instructions and grounded reference context.
     chatStage = 'legal_retrieval';
-    const legalDocs = await searchLegalDocs(supabase, message, history, replyLanguage);
+    const legalDocs = await searchLegalDocs(supabase, message, history, replyLanguage, { resolvedRoute: routing });
 
     // Stream actual model tokens to the UI. JSON callers retain the existing API.
     if (streaming) {
@@ -350,7 +353,7 @@ app.post('/api/chat', async (req, res) => {
     }
     chatStage = 'generate';
     const aiText = await chatProvider.reply({
-      message, role, history, legalDocs, replyLanguage, streaming, signal: generation.signal,
+      message, role, history, legalDocs, routing, replyLanguage, streaming, signal: generation.signal,
       onEvent: (event, data) => {
         if (event === 'token') streamedReply += data.text;
         if (streaming) sendEvent(event, data);

@@ -21,7 +21,11 @@ export function questionRoute(message, history = []) {
   if (/\b(?:suicid\w*|kill myself|hurt myself|can't breathe|cannot breathe|medical emergency|in immediate danger)\b/i.test(text)) return { kind: 'safety' };
   if (/\b(?:children|child|kids?|umwana|abana|enfant).*(?:work|akazi|gukora|travail)|\b(?:work|akazi|travail).*(?:children|child|kids?|umwana|abana|enfant)|\b(?:jimmy mcgill|saul goodman|better call saul)|\b(?:paid|bought).*(?:never|not|didn't|refus).*(?:deliver|receive|refund)|\b(?:minimum age).*(?:work|employ)/i.test(text)) return { kind: 'legal', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
   if (legalWords.test(text) || matchedLegalVocabulary(message).some(entry => entry.topic) || vatQuestion(message)) return { kind: 'legal', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
-  if (unrelated.test(text)) return { kind: 'unrelated' };
+  // Intercept only clear off-topic requests. A sentence mentioning food or
+  // technology might describe a consumer complaint or other indirect issue.
+  if (unrelated.test(text) && (/^i (?:want|need|like) (?:some |a |an )?(?:yog(?:h|o|oh)?urt|pizza|milk|coffee|tea)(?: please)?[\s.!?]*$/i.test(text)
+    || /^(?:please )?(?:give|show|write|make|find|recommend|suggest|tell).*(?:recipe|football scores|sports scores|python code|javascript code)/i.test(text)
+    || /^latest (?:football|soccer|sports|news)\b/i.test(text))) return { kind: 'unrelated' };
   if (followup.test(text) || onlineFollowup.test(text) || isCorrectionRequest(message)) {
     // Only user context can establish a topic. A previous erroneous assistant
     // PDF citation must never make the next message a legal request.

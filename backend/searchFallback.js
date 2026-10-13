@@ -28,14 +28,14 @@ export function createSearchFallback({ primary, client, enabled = false, model =
   let blockedUntil = 0;
   let blockedReason = 'unavailable';
   return {
-    async lookup({ message, history = [], signal, onFallback = () => {} }) {
+    async lookup({ message, history = [], routing, signal, onFallback = () => {} }) {
       signal?.throwIfAborted();
       let result;
-      try { result = await primary.lookup({ message, history, signal }); }
+      try { result = await primary.lookup({ message, history, routing, signal }); }
       catch { signal?.throwIfAborted(); result = { status: 'unavailable', reason: 'unavailable', sources: [] }; }
       signal?.throwIfAborted();
       if (!enabled || !webSearchEnabled(model, 'true') || ['ok', 'cached', 'not_needed'].includes(result.status)) return result;
-      const plan = publicSearchPlan(message, history);
+      const plan = publicSearchPlan(message, history, routing);
       if (!plan) return result;
       const cacheKey = JSON.stringify(plan);
       const work = queue.then(async () => {

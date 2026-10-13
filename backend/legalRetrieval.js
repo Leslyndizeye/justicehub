@@ -52,10 +52,11 @@ export function rankLegalDocuments(documents, message, topic, language = 'en') {
   }).slice(0,4);
 }
 
-export async function searchLegalDocs(client, message, history = [], language = 'en', {localSearch=searchLocalLaws}={}) {
-  const route = questionRoute(message, history);
+export async function searchLegalDocs(client, message, history = [], language = 'en', {localSearch=searchLocalLaws,resolvedRoute}={}) {
+  const route = resolvedRoute || questionRoute(message, history);
   if (route.kind !== 'legal') return [];
   if (route.context) message = `${route.context}\n${message}`;
+  if (route.researchTopic) message += `\nLegal research topic: ${route.researchTopic}`;
   const { retrievalQuery, topic } = interpretLegalQuestion(message, history);
   try {
     const vat = vatQuestion(message, history);

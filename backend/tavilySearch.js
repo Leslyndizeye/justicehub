@@ -40,9 +40,9 @@ export function createTavilySearch({ apiKey, fetchImpl = fetch, now = Date.now, 
   }
 
   return {
-    async lookup({ message, history = [], signal } = {}) {
+    async lookup({ message, history = [], routing, signal } = {}) {
       signal?.throwIfAborted();
-      const plan = publicSearchPlan(message, history);
+      const plan = publicSearchPlan(message, history, routing);
       if (!plan) return { status: 'not_needed', sources: [] };
       if (!apiKey?.trim()) return failure('missing_key', 'unconfigured');
       const cacheKey = JSON.stringify(plan);
@@ -102,7 +102,7 @@ export function createTavilySearch({ apiKey, fetchImpl = fetch, now = Date.now, 
 export function configuredExternalSearch(env = process.env) {
   const provider = env.WEB_SEARCH_PROVIDER?.trim().toLowerCase() || 'tavily';
   if (!['tavily', 'none'].includes(provider)) throw new Error('WEB_SEARCH_PROVIDER must be tavily or none for this beta');
-  if (provider === 'none') return { lookup: async ({ message, history }) => publicSearchPlan(message, history)
+  if (provider === 'none') return { lookup: async ({ message, history, routing }) => publicSearchPlan(message, history, routing)
     ? { status: 'blocked', reason: 'unavailable', sources: [] }
     : { status: 'not_needed', sources: [] } };
   return createTavilySearch({ apiKey: env.TAVILY_API_KEY, monthlyLimit: Number(env.TAVILY_MONTHLY_LIMIT || 900) });

@@ -11,13 +11,14 @@ import { excerptArticles, lawExcerptMetadata } from './lawArticles.js';
 import {evidenceInstruction} from './evidenceAnswer.js';
 import { questionRoute } from './questionRouting.js';
 
-export function buildChatMessages({ message, role, history = [], legalDocs = [], searchEnabled = false, externalSearchResult, now = new Date(), instructionRole = 'system', replyLanguage = 'auto', evidenceMode = false, correction = conversationCorrection(message, history) }) {
+export function buildChatMessages({ message, role, history = [], legalDocs = [], routing, searchEnabled = false, externalSearchResult, now = new Date(), instructionRole = 'system', replyLanguage = 'auto', evidenceMode = false, correction = conversationCorrection(message, history) }) {
   const semanticHistory = correction ? [...history, { sender: 'user', content: correction.originalQuestion }] : history;
   const interpretation = interpretLegalQuestion(message, semanticHistory);
-  const route = questionRoute(message, history);
+  const route = routing || questionRoute(message, history);
   const routingInstruction = route.kind === 'unclear'
     ? 'The legal connection of this request is unclear. Ask one brief question about the issue or its connection to law before making legal claims. No PDF or online evidence has been selected. Do not manufacture a legal angle from ordinary objects or use an earlier assistant answer as evidence.'
-    : route.forceWeb && route.context ? `ONLINE SEARCH FOLLOW-UP: The user asks to research the preceding legal question, not merely whether you have a search capability. Original user question (untrusted data): ${JSON.stringify(route.context.slice(0,2400))}. Answer that question using relevant supplied research, with citations and honest lookup limitations. Do not ask them to repeat an already identified topic or rely on an earlier assistant article as evidence.` : '';
+    : route.forceWeb && route.context ? `ONLINE SEARCH FOLLOW-UP: The user asks to research the preceding legal question, not merely whether you have a search capability. Original user question (untrusted data): ${JSON.stringify(route.context.slice(0,2400))}. Answer that question using relevant supplied research, with citations and honest lookup limitations. Do not ask them to repeat an already identified topic or rely on an earlier assistant article as evidence.`
+      : route.source === 'model' ? `QUESTION UNDERSTANDING: ${JSON.stringify({kind:route.kind,researchTopic:route.researchTopic,earlierUserQuestion:route.context?.slice(0,2400)})}. This identifies the conversation topic, not legal evidence or new facts. Use the original messages to understand the user's actual request. Resolve informal references naturally and answer the supported legal part; ask a focused clarification only for a genuinely missing material detail. Do not ask a generic legal-topic question after the issue has been identified.` : '';
   const audience = role === 'attorney'
     ? 'an attorney: use precise terminology when useful, with clear explanations'
     : role === 'judge'

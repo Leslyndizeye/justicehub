@@ -18,6 +18,7 @@ import {referencesForQuestion} from './legalReferences.js';
 import {evidenceResponseFormat,validateEvidenceAnswer,renderEvidenceAnswer} from './evidenceAnswer.js';
 import {prepareEvidenceRequest} from './evidenceRequest.js';
 import { questionRoute, scopeReply, insufficientSourcesReply } from './questionRouting.js';
+import { inferQuestionRoute } from './questionUnderstanding.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -110,7 +111,28 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
   const cooldowns = new Map();
   const models = [...new Set([model, fallbackModel].filter(value => value && value !== 'none'))];
   return {
-    async reply({ message, role, history, legalDocs, replyLanguage = 'auto', streaming, signal, onEvent = () => {} }) {
+    async understand({ message, history = [], signal }) {
+      signal?.throwIfAborted();
+      const local = questionRoute(message, history);
+      if (local.kind !== 'unclear') return local;
+      for (const candidate of models) {
+        if ((cooldowns.get(candidate)?.until || 0) > now()) continue;
+        const timeout = AbortSignal.timeout(Math.min(requestTimeoutMs, 10000));
+        try {
+          const route = await inferQuestionRoute({ client, model: candidate, message, history,
+            signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
+          return route || local;
+        } catch (error) {
+          signal?.throwIfAborted();
+          if (error.status === 429) {
+            const seconds = retryDelaySeconds(error, now());
+            cooldowns.set(candidate, { until: now() + seconds * 1000, strikes: 1 });
+          } else if (![404, 408, 500, 502, 503, 504].includes(error.status) && !providerFailure(error, timeout.aborted)) return local;
+        }
+      }
+      return local;
+    },
+    async reply({ message, role, history, legalDocs, routing, replyLanguage = 'auto', streaming, signal, onEvent = () => {} }) {
       const language = resolveReplyLanguage(message, history, replyLanguage);
       const copy = languageCopy(language);
       const correction = conversationCorrection(message, history);
@@ -120,7 +142,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         if (streaming) onEvent('token', { text: greeting });
         return greeting;
       }
-      const route = questionRoute(message, history);
+      const route = routing || questionRoute(message, history);
       if (route.kind === 'unrelated') {
         const reply = scopeReply(language);
         if (streaming) onEvent('token', { text: reply });
@@ -154,7 +176,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         }
         if (needsResearch && externalSearch && !externalSearchResult) {
           onEvent('status', { text: copy.search, webSearch: false });
-          externalSearchResult = await externalSearch.lookup({ message, history, signal, onFallback: () => onEvent('status', { text: copy.searchFallback, webSearch: false }) });
+          externalSearchResult = await externalSearch.lookup({ message, history, routing: route, signal, onFallback: () => onEvent('status', { text: copy.searchFallback, webSearch: false }) });
           signal?.throwIfAborted();
           onEvent('status', { text: externalSearchNotice(externalSearchResult, language).trim() || (externalSearchResult.status === 'ok' ? externalSearchResult.provider === 'groq' ? copy.searchFallbackUsed : copy.search : ''), webSearch: ['ok', 'cached'].includes(externalSearchResult.status) });
         }
@@ -167,12 +189,12 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
           const gptOss = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(candidate);
           let context=boundedContext(reviewedVocabularyHistory(history),legalDocs);
           const evidenceMode=gptOss && context.legalDocs.some(doc=>doc.coverage && lawExcerptMetadata(doc));
-          const prepared=evidenceMode ? prepareEvidenceRequest({message,role,...context,language,correction,research:externalSearchResult,now:new Date(now())},recoveredLookup) : null;
+          const prepared=evidenceMode ? prepareEvidenceRequest({message,role,...context,routing:route,language,correction,research:externalSearchResult,now:new Date(now())},recoveredLookup) : null;
           if(prepared)context=prepared.context;
           const bundle=prepared?.bundle;
           const request = {
             model: candidate,
-            messages: prepared?.messages || buildChatMessages({ message, role, ...context, evidenceMode, correction, replyLanguage: language, externalSearchResult, searchEnabled: needsResearch && !externalSearch && !recoveredLookup && webSearchEnabled(candidate, searchSetting), now: new Date(now()), instructionRole: gptOss ? 'developer' : 'system' }),
+            messages: prepared?.messages || buildChatMessages({ message, role, ...context, routing:route, evidenceMode, correction, replyLanguage: language, externalSearchResult, searchEnabled: needsResearch && !externalSearch && !recoveredLookup && webSearchEnabled(candidate, searchSetting), now: new Date(now()), instructionRole: gptOss ? 'developer' : 'system' }),
             temperature: evidenceMode ? 0.1 : 0.4,
             max_completion_tokens: 2048,
             ...(evidenceMode ? {response_format:evidenceResponseFormat(bundle)} : externalSearch || !needsResearch ? { tool_choice: 'none' } : !recoveredLookup ? searchOptions(candidate, message, searchSetting) : {}),
@@ -199,7 +221,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
                 // reports insufficient support; no draft has been published.
                 needsResearch = true;
                 onEvent('status', { text: copy.search, webSearch: false });
-                externalSearchResult = await externalSearch.lookup({ message, history, signal,
+                externalSearchResult = await externalSearch.lookup({ message, history, routing: route, signal,
                   onFallback: () => onEvent('status', { text: copy.searchFallback, webSearch: false }) });
                 signal?.throwIfAborted();
                 onEvent('status', { text: '', webSearch: ['ok', 'cached'].includes(externalSearchResult.status) });
