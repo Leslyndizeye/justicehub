@@ -1,5 +1,4 @@
 import { interpretLegalQuestion } from './legalQuestion.js';
-import { interpretCasualMessage } from '../shared/chatCasual.js';
 import { vatQuestion } from './legalTaxTopic.js';
 import { questionRoute } from './questionRouting.js';
 
@@ -21,9 +20,6 @@ export function publicSearchPlan(message, history = [], routing) {
   const route = routing || questionRoute(message, history);
   if (route.kind !== 'legal') return null;
   if (route.context) message = `${route.context}\n${message}`;
-  if (interpretCasualMessage(message)?.standalone) return null;
-  if (/^(?:hello|hi|hey+|yoo+|muraho|mwiriwe|mwaramutse|thanks|murakoze)[!.?\s]*$/i.test(message.trim())) return null;
-  if (/\b(?:your purpose|my name|remember about me|izina ryanjye|uranyibuka)\b/i.test(message)) return null;
   const interpretation = interpretLegalQuestion(message, history);
   const vat = vatQuestion(message, history);
   if (vat || route.researchTopic === 'value added tax VAT') return {query:`Rwanda value added tax VAT law 049/2023 amendments${vat?.article ? ` article ${vat.article}` : ''}`, legal:true, legalTopic:'vat', topic:'general'};

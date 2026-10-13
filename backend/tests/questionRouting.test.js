@@ -36,7 +36,7 @@ test('unrelated food requests never reach PDF, database, model or web search, ev
 
 test('actual legal connections override ordinary words, but previous assistant claims cannot invent one', () => {
   for (const message of [question, 'My employer has not paid my salary', 'Can I get a refund for expired yoghurt?',
-    'I was sold unsafe food. What are my rights?', 'Do you know Jimmy McGill in Better Call Saul?',
+    'I was sold unsafe food. What are my rights?',
     'What does the law say about sports betting?', 'Ndatubuwe amafaranga', 'I paid for a phone but never received it']) {
     assert.equal(questionRoute(message).kind, 'legal', message);
   }
@@ -47,6 +47,66 @@ test('actual legal connections override ordinary words, but previous assistant c
   assert.equal(questionRoute('What do you like to eat?').kind, 'social');
   assert.equal(questionRoute('I cannot breathe').kind, 'safety');
   assert.equal(questionRoute('Can you explain that thing?').kind, 'unclear');
+});
+
+test('fictional lawyer identity questions use conversation without PDFs, database or web research', async () => {
+  const never = () => { throw new Error('No legal research for fictional identity'); };
+  const history = [{ sender: 'user', content: question }, { sender: 'ai', content: 'Article 20: Counterfeiting negotiable instruments.' }];
+  const expected = 'Yes. Jimmy McGill is the fictional lawyer also known as Saul Goodman in Better Call Saul.';
+  let calls = 0;
+  const provider = createChatProvider({ model: 'openai/gpt-oss-120b', externalSearch: { lookup: never }, client: client(async request => {
+    calls++;
+    assert.equal(request.response_format, undefined);
+    assert.equal(request.tools, undefined);
+    assert.equal(request.tool_choice, 'none');
+    assert.match(request.messages[0].content, /permitted conversational discussion/);
+    assert.doesNotMatch(request.messages[0].content, /Amategeko PDF:|BACKEND WEB RESEARCH/);
+    if (request.stream) return (async function* () { yield { choices: [{ delta: { content: expected } }] }; })();
+    return { choices: [{ message: { content: expected } }] };
+  }) });
+  for (const message of ['do uknow jimmy mcgill', 'do u knowjimmy mcgill', 'do uknowjimmymcgill', 'do u know Jimmy McGill?', 'Do you know Jimmy McGill in Better Call Saul?',
+    'Who is Saul Goodman?', 'Tell me about Jimmy McGill.']) {
+    const routing = await provider.understand({ message, history });
+    assert.equal(routing.kind, 'social', message);
+    assert.deepEqual(await searchLegalDocs({ from: never }, message, history, 'en', { localSearch: never, resolvedRoute: routing }), []);
+    assert.equal(publicSearchPlan(message, history, routing), null);
+    const tokens = [];
+    const reply = await provider.reply({ message, history, legalDocs: docs, routing, replyLanguage: 'en', streaming: true,
+      onEvent(event, data) { if (event === 'token') tokens.push(data.text); } });
+    assert.equal(reply, expected); assert.equal(tokens.join(''), expected);
+    assert.doesNotMatch(reply, /Article|PDF|could not verify|counterfeit/i);
+  }
+  assert.equal(calls, 7, 'Only the conversational answer calls the model');
+  for (const message of ['tell me more', 'in English', 'why?']) {
+    assert.equal(questionRoute(message, [{ sender: 'user', content: 'Do you know Jimmy McGill?' }]).kind, 'social');
+  }
+});
+
+test('fictional plot and comparisons with real law are distinguished before retrieval', async () => {
+  let calls = 0;
+  const provider = createChatProvider({ model: 'openai/gpt-oss-120b', client: client(async request => {
+    calls++;
+    assert.equal(request.response_format.json_schema.name, 'question_understanding');
+    assert.match(request.messages[0].content, /SOCIAL conversation with topic=none/);
+    const message = JSON.parse(request.messages[1].content).message;
+    return completion(message.includes('Rwanda')
+      ? { kind: 'legal', topic: 'legal_profession', anchor: null, forceWeb: false, followup: false }
+      : { kind: 'social', topic: 'none', anchor: null, forceWeb: false, followup: false });
+  }) });
+  const plot = 'Why did Jimmy McGill become Saul Goodman?';
+  const legal = 'Would Jimmy McGill be allowed to practise as a lawyer in Rwanda?';
+  assert.equal(questionRoute(plot).kind, 'unclear');
+  const plotRoute = await provider.understand({ message: plot });
+  assert.equal(plotRoute.kind, 'social'); assert.equal(publicSearchPlan(plot, [], plotRoute), null);
+  const followup = 'What crimes did he commit in the show?';
+  const history = [{ sender: 'user', content: 'Do you know Jimmy McGill?' }];
+  assert.equal(questionRoute(followup, history).kind, 'unclear');
+  const followupRoute = await provider.understand({ message: followup, history });
+  assert.equal(followupRoute.kind, 'social'); assert.equal(publicSearchPlan(followup, history, followupRoute), null);
+  const legalRoute = await provider.understand({ message: legal });
+  assert.equal(legalRoute.kind, 'legal');
+  assert.match(publicSearchPlan(legal, [], legalRoute).query, /Rwanda lawyer advocate bar association/);
+  assert.equal(calls, 3);
 });
 
 test('a supported PDF answer makes one source-checked model call and no online search', async () => {

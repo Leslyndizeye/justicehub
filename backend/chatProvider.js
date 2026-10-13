@@ -166,6 +166,8 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       const rateLimits = [];
       let emittedText = false;
       let externalSearchResult;
+      let evidenceRepairUsed = false;
+      let repairReason;
       for (const [index, candidate] of models.entries()) {
         signal?.throwIfAborted();
         const cooldown = cooldowns.get(candidate);
@@ -182,14 +184,14 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         }
         if (index > 0) onEvent('status', { text: copy.fallback, webSearch: false });
         let recoveredLookup = false;
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < 4; attempt++) {
           const lookupNotice = externalSearch ? externalSearchNotice(externalSearchResult, language) : copy.lookupNotice;
           const showLookupNotice = externalSearch ? Boolean(lookupNotice) : recoveredLookup;
           const search = createSearchTracker({ language });
           const gptOss = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(candidate);
           let context=boundedContext(reviewedVocabularyHistory(history),legalDocs);
           const evidenceMode=gptOss && context.legalDocs.some(doc=>doc.coverage && lawExcerptMetadata(doc));
-          const prepared=evidenceMode ? prepareEvidenceRequest({message,role,...context,routing:route,language,correction,research:externalSearchResult,now:new Date(now())},recoveredLookup) : null;
+          const prepared=evidenceMode ? prepareEvidenceRequest({message,role,...context,routing:route,language,correction,research:externalSearchResult,now:new Date(now()),repairReason},recoveredLookup) : null;
           if(prepared)context=prepared.context;
           const bundle=prepared?.bundle;
           const request = {
@@ -215,7 +217,14 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
               const completion=await client.chat.completions.create({...request,stream:false},{signal:requestSignal});
               signal?.throwIfAborted();
               const result=validateEvidenceAnswer(completion.choices?.[0]?.message?.content || '',bundle,message,language);
-              if (!result.ok && result.reason === 'insufficient' && externalSearch && !externalSearchResult && attempt < 2) {
+              if (!result.ok && result.reason !== 'insufficient' && !evidenceRepairUsed && attempt < 3) {
+                // Reuse the same evidence once to obtain a checked explanation;
+                // never publish the failed draft or research merely to mask it.
+                evidenceRepairUsed = true;
+                repairReason = result.reason;
+                continue;
+              }
+              if (!result.ok && result.reason === 'insufficient' && externalSearch && !externalSearchResult && attempt < 3) {
                 // A retrieved PDF is not proof that it answers this question.
                 // Try external evidence once only after the PDF-only draft
                 // reports insufficient support; no draft has been published.

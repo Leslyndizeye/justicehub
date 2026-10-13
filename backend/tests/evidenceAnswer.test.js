@@ -15,6 +15,7 @@ const check=(answer=valid())=>validateEvidenceAnswer(JSON.stringify(answer),bund
 test('exact PDF quotations and paragraph attribution render readable, dated evidence with one source link',()=>{
   const result=check();assert.equal(result.ok,true);
   const reply=renderEvidenceAnswer(result,'en');
+  assert.match(reply,/\*\*In plain language:\*\* Smaller taxpayers/);
   assert.match(reply,/Article 28\(4\)/);assert.match(reply,/Original source text/);assert.ok(reply.includes(quote.split('\n')[0]));
   assert.match(reply,/LAW ESTABLISHING VALUE ADDED TAX\.pdf/);assert.equal((reply.match(/\]\(https:/g)||[]).length,1);
   assert.match(reply,/Later amendments/);
@@ -85,10 +86,59 @@ test('PDF-backed generation is a single structured request and streams only the 
   assert.equal(calls,1);assert.equal(events.join(''),reply);assert.doesNotMatch(reply,/source_id|"points"/);assert.match(reply,/choose monthly/);
 });
 
-test('invalid evidence yields the original source passage instead of a second correction call or unchecked answer',async()=>{
+test('persistently invalid evidence stops after one repair and shows source wording without unchecked advice',async()=>{
   const answer=valid();answer.points[0].statement='Declare within 30 days after the week.';
   let calls=0;const events=[];
   const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',searchSetting:'false',client:{chat:{completions:{async create(){calls++;return{choices:[{message:{content:JSON.stringify(answer)}}]};}}}}});
   const reply=await provider.reply({message,legalDocs:docs,replyLanguage:'en',streaming:true,onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
-  assert.equal(calls,1);assert.equal(events.join(''),reply);assert.doesNotMatch(reply,/30 days after the week|source_id|\[…\]/);assert.match(reply,/exact wording/);
+  assert.equal(calls,2);assert.equal(events.join(''),reply);assert.doesNotMatch(reply,/30 days after the week|source_id|\[…\]/);assert.match(reply,/exact wording/);
+});
+
+test('an explanation that merely repeats a long quotation requires a plain-language repair',()=>{
+  const copied=valid(); copied.points[0].statement=quote;
+  assert.equal(check(copied).reason,'explanation');
+  assert.equal(check(valid()).ok,true);
+});
+
+test('a failed PDF explanation is repaired once against the same sources before streaming readable prose',async()=>{
+  const requests=[]; const events=[];
+  const bad=valid(); bad.points[0].statement='Declare within 30 days after the week.';
+  const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',externalSearch:{lookup(){throw new Error('Reuse PDF evidence, no new search');}},
+    client:{chat:{completions:{async create(request){requests.push(request);return{choices:[{message:{content:JSON.stringify(requests.length===1?bad:valid())}}]};}}}}});
+  const reply=await provider.reply({message,legalDocs:docs,replyLanguage:'en',streaming:true,onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
+  assert.equal(requests.length,2); assert.equal(events.length,1); assert.equal(events.join(''),reply);
+  assert.match(requests[1].messages[0].content,/EXPLANATION REPAIR/);
+  assert.ok(requests.every(request=>request.messages.at(-1).content===message && request.response_format.json_schema.strict && request.tools===undefined));
+  assert.ok(requests.every(request=>request.messages[0].content.includes(JSON.stringify(quote).slice(1,-1))));
+  assert.match(reply,/In plain language/); assert.match(reply,/choose monthly VAT declarations/); assert.match(reply,/Original source text/);
+  assert.equal((reply.match(/\]\(https:/g)||[]).length,1);
+  assert.doesNotMatch(reply,/30 days after the week|could not verify an explanation|EXPLANATION REPAIR/);
+});
+
+test('explanations and conditional application remain supported and labeled in the requested language',()=>{
+  const english=valid(); english.points.push({kind:'application',statement:'If you fall within the smaller-taxpayer category, monthly filing is an option rather than a requirement.',evidence:[{source_id:'P1',quote,paragraph:4}]});
+  const checked=check(english); assert.equal(checked.ok,true);
+  const rendered=renderEvidenceAnswer(checked,'en');
+  assert.match(rendered,/How this relates to your question/); assert.match(rendered,/If you fall/);
+  assert.equal((rendered.match(/\]\(https:/g)||[]).length,1);
+  for(const [language,label,statement] of [
+    ['rw','Ibisobanuro mu magambo yoroshye','Abasora bato bashobora guhitamo kumenyekanisha umusoro ku nyongeragaciro buri kwezi.'],
+    ['fr','En termes simples','Les petits contribuables peuvent choisir de déclarer la TVA chaque mois.'],
+  ]) {
+    const answer=valid(); answer.points[0].statement=statement;
+    const result=validateEvidenceAnswer(JSON.stringify(answer),bundle,message,language);
+    assert.equal(result.ok,true,language);
+    const reply=renderEvidenceAnswer(result,language);
+    assert.ok(reply.includes(label)); assert.ok(reply.includes(statement)); assert.ok(reply.includes(quote.split('\n')[0]));
+  }
+});
+
+test('Stop during a rejected PDF draft prevents a repair request or any published quotation',async()=>{
+  const controller=new AbortController(); let calls=0; const events=[];
+  const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',client:{chat:{completions:{async create(){
+    calls++;controller.abort();return{choices:[{message:{content:'invalid draft'}}]};
+  }}}}});
+  await assert.rejects(provider.reply({message,legalDocs:docs,replyLanguage:'en',signal:controller.signal,streaming:true,
+    onEvent:(event,data)=>{if(event==='token')events.push(data.text);}}),{name:'AbortError'});
+  assert.equal(calls,1); assert.deepEqual(events,[]);
 });

@@ -1,10 +1,10 @@
 import {buildChatMessages} from './chatPrompt.js';
-import {evidenceBundle} from './evidenceAnswer.js';
+import {evidenceBundle,evidenceRepairInstruction} from './evidenceAnswer.js';
 
 // Character budgets are conservative heuristics, not exact tokenizer counts.
 // Drop whole optional context entries. Never cut the user's latest question,
 // an article, a quotation, or the application's source-check instructions.
-export function prepareEvidenceRequest({message,role,history=[],legalDocs=[],routing,language,correction,research,now},compact=false) {
+export function prepareEvidenceRequest({message,role,history=[],legalDocs=[],routing,language,correction,research,now,repairReason},compact=false) {
   const context={history:[...history],legalDocs:[...legalDocs]};
   let limitedResearch=research && {...research,sources:[...(research.sources || [])]};
   const budget=compact?12000:18000;
@@ -13,6 +13,7 @@ export function prepareEvidenceRequest({message,role,history=[],legalDocs=[],rou
     bundle=evidenceBundle(message,context.history,context.legalDocs,limitedResearch);
     messages=buildChatMessages({message,role,...context,routing,legalDocs:bundle.docs,evidenceMode:true,correction,
       replyLanguage:language,externalSearchResult:bundle.research,searchEnabled:false,now,instructionRole:'developer'});
+    if(repairReason)messages[0].content+='\n'+evidenceRepairInstruction(repairReason);
     return messages.reduce((sum,item)=>sum+item.content.length,0);
   };
   let size=build();

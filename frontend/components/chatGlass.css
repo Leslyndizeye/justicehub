@@ -211,6 +211,9 @@
   animation: chat-rainfall linear infinite;
 }
 .chat-rain-notice { margin: 0; padding: 0 8px; font-size: 11px; line-height: 1.5; color: var(--chat-muted); }
+.chat-rain-volume { display: flex; align-items: center; gap: 12px; padding: 0 8px 6px; color: var(--chat-muted); font-size: 11px; }
+.chat-rain-volume span { flex-shrink: 0; }
+.chat-rain-volume input { width: 100%; min-width: 0; accent-color: var(--chat-accent); }
 @keyframes chat-rainfall { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-30px, calc(100dvh + 130px), 0); } }
 @media (prefers-reduced-motion: reduce) { .chat-rain { display: none; } }
 .chat-loading { justify-content: center; align-items: center; background: linear-gradient(135deg, #040404, #252525); }

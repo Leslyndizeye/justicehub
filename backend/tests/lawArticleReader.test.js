@@ -66,7 +66,7 @@ test('a model draft citing an absent PDF article is withheld; source-reading fal
     client:{chat:{completions:{async create(){requests++;return{choices:[{message:{content:JSON.stringify({status:'answered',points:[{kind:'rule',statement:'Article 999 creates an automatic exemption.',evidence:[{source_id:'P1',quote:docs[0].content.split('\n').slice(2).join('\n').slice(0,80),paragraph:null}]}]})}}]};}}}}});
   const reply=await provider.reply({message:'Explain VAT article 28 in English',legalDocs:docs,replyLanguage:'en',streaming:true,
     onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
-  assert.equal(requests,1,'No paid or repeated correction request');
+  assert.equal(requests,2,'At most one source-checked explanation repair');
   assert.equal(events.join(''),reply);
   assert.doesNotMatch(reply,/automatic exemption|Article 999/);
   assert.match(reply,/exact wording/);

@@ -42,9 +42,11 @@ test('PDF requests bound combined instructions, whole provisions, history and re
   const original=JSON.stringify(input);
   const prepared=prepareEvidenceRequest(input);
   const compact=prepareEvidenceRequest(input,true);
+  const repaired=prepareEvidenceRequest({...input,repairReason:'filing_period'},true);
   assert.ok(prepared.size<=18000);assert.ok(compact.size<=12000);
+  assert.ok(repaired.size<=12000);assert.match(repaired.messages[0].content,/changed the filing period/);
   assert.ok(compact.size<prepared.size);
-  for(const request of [prepared,compact]) {
+  for(const request of [prepared,compact,repaired]) {
     assert.equal(request.context.legalDocs[0].articleNumber,16);
     assert.equal(request.messages.at(-1).content,message);
     for(const doc of request.context.legalDocs)assert.ok(docs.some(original=>original.content===doc.content));

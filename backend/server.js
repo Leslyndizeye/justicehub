@@ -21,7 +21,8 @@ const allowedOrigins = configuredCorsOrigins(process.env.FRONTEND_URL);
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 // Public liveness probe for the hosting platform; returns no account or database data.
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/health', (req, res) => res.json({ status: 'ok', revision: /^[a-f0-9]{40}$/i.test(process.env.RENDER_GIT_COMMIT || '')
+  ? process.env.RENDER_GIT_COMMIT.slice(0, 12) : 'local' }));
 const verifyIdentity = createFirebaseIdentity({ projectId: process.env.FIREBASE_PROJECT_ID?.trim() || 'ireme-30164' });
 app.use('/api/memory', memoryRouter({ verify: verifyIdentity, store: configuredMemoryStore() }));
 app.use('/api', apiAccess({ verify: verifyIdentity,

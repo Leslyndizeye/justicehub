@@ -86,16 +86,19 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
   const sessionsRequest = useRef(0);
   const [rainActive, setRainActive] = useState(false);
   const [rainError, setRainError] = useState('');
-  const rainPlayer = useMemo(() => createAmbientRain(), []);
+  const [rainVolume, setRainVolume] = useState(50);
   const rainEnabled = useRef(false);
   const rainAttempt = useRef(0);
+  const rainPlayer = useMemo(() => createAmbientRain({ onPlaybackChange: (playing: boolean) => {
+    setRainActive(playing);
+    if (!playing) rainEnabled.current = false;
+  } }), []);
   useEffect(() => () => { rainEnabled.current = false; rainAttempt.current++; rainPlayer.stop(); }, [rainPlayer]);
 
   const toggleRain = async () => {
     const attempt = ++rainAttempt.current;
     const enabled = !rainEnabled.current;
     rainEnabled.current = enabled;
-    setRainActive(enabled);
     setRainError('');
     if (!enabled) { rainPlayer.stop(); return; }
     try { await rainPlayer.start(); }
@@ -607,6 +610,11 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
           <button type="button" onClick={() => void toggleRain()} className={`chat-ambient-button ${rainActive ? 'is-active' : ''}`} aria-pressed={rainActive}>
             <CloudRain size={17} aria-hidden="true" /><span>Ambient rain</span><span className="chat-toggle-track" aria-hidden="true"><span /></span>
           </button>
+          {rainActive && <label className="chat-rain-volume">
+            <span>Rain volume</span>
+            <input type="range" min="0" max="100" value={rainVolume} aria-label="Rain volume" aria-valuetext={`${rainVolume}%`}
+              onChange={event => { const value = Number(event.target.value); setRainVolume(value); rainPlayer.setVolume(value / 100); }} />
+          </label>}
           {rainError && <p className="chat-rain-notice" role="status">{rainError}</p>}
           <div className="chat-account">
             <div className="chat-account-avatar" aria-hidden="true">{displayName.charAt(0).toUpperCase()}</div>
