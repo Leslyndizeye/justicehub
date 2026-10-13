@@ -9,10 +9,13 @@ import { casualInstruction } from '../shared/chatCasual.js';
 import { externalSearchInstruction } from './externalSearch.js';
 import { excerptArticles, lawExcerptMetadata } from './lawArticles.js';
 import {evidenceInstruction} from './evidenceAnswer.js';
+import { questionRoute } from './questionRouting.js';
 
 export function buildChatMessages({ message, role, history = [], legalDocs = [], searchEnabled = false, externalSearchResult, now = new Date(), instructionRole = 'system', replyLanguage = 'auto', evidenceMode = false, correction = conversationCorrection(message, history) }) {
   const semanticHistory = correction ? [...history, { sender: 'user', content: correction.originalQuestion }] : history;
   const interpretation = interpretLegalQuestion(message, semanticHistory);
+  const routingInstruction = questionRoute(message, history).kind === 'unclear'
+    ? 'The legal connection of this request is unclear. Ask one brief question about the issue or its connection to law before making legal claims. No PDF or online evidence has been selected. Do not manufacture a legal angle from ordinary objects or use an earlier assistant answer as evidence.' : '';
   const audience = role === 'attorney'
     ? 'an attorney: use precise terminology when useful, with clear explanations'
     : role === 'judge'
@@ -59,6 +62,7 @@ If someone expresses temptation ("I want to steal"), encourage pausing and pract
 EVIDENCE AND LIVE INFORMATION
 Today's UTC date is ${now.toISOString().slice(0, 10)}. Interpret relative dates using it.
 ${webInstructions}
+${routingInstruction}
 - Specific laws, articles, penalties, deadlines, eligibility, procedures, tax rates, and contact details must come from supplied references or actual relevant official web sources. Link the exact source; never invent a citation or reuse an unsupported earlier assistant claim.
 - General document-reading and case-preparation suggestions are useful even without a verified legal rule. Distinguish these suggestions from requirements or remedies under Rwandan law. If the applicable rule is unverified, say so and give a useful next step; do not guess a "usual" rule.
 - Compare publication, enactment, and effective dates for new laws; compare publication and event dates for news. An old source is not evidence of a new development. If you cannot verify a more recent law, say so.

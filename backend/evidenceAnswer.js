@@ -64,7 +64,8 @@ export function validateEvidenceAnswer(raw,bundle,message,language) {
     if(typeof raw!=='string'||raw.length>22000)return {ok:false,reason:'format'};
     const answer=JSON.parse(raw);
     if(!answer || Object.keys(answer).some(key=>!['status','points'].includes(key)) || !['answered','insufficient'].includes(answer.status) || !Array.isArray(answer.points))return {ok:false,reason:'format'};
-    if(answer.status!=='answered'||answer.points.length<1||answer.points.length>6)return {ok:false,reason:'insufficient'};
+    if(answer.status==='insufficient')return {ok:false,reason:answer.points.length===0?'insufficient':'format'};
+    if(answer.points.length<1||answer.points.length>6)return {ok:false,reason:'format'};
     const known=new Map(bundle.sources.map(source=>[source.id,source]));
     const checked=[];
     for(const point of answer.points) {

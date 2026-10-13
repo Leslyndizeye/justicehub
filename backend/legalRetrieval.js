@@ -1,11 +1,11 @@
 import { interpretLegalQuestion } from './legalQuestion.js';
 import { matchedLegalVocabulary } from './legalVocabulary.js';
-import { interpretCasualMessage } from '../shared/chatCasual.js';
 import lawCatalog from './data/amategekoCatalog.json' with {type:'json'};
 import { vatQuestion, vatFocusArticles } from './legalTaxTopic.js';
 import { excerptArticles, lawExcerptMetadata } from './lawArticles.js';
 import { expandLawArticles } from './lawArticleReader.js';
 import {searchLocalLaws} from './localLawSearch.js';
+import { questionRoute } from './questionRouting.js';
 
 const noise = new Set('a an the is are was were be been being of in on for to at and or with from by as it this that these those me my you your i we our us please explain tell show understand what which how why when about law laws rwanda rwandan article articles no number latest current english french kinyarwanda under relating governing says does do should could would rwo bya ibyo kuri ni iki gute amategeko mbwira'.split(' '));
 const catalogue = new Map(lawCatalog.documents.map(doc=>[doc.key,doc]));
@@ -53,7 +53,9 @@ export function rankLegalDocuments(documents, message, topic, language = 'en') {
 }
 
 export async function searchLegalDocs(client, message, history = [], language = 'en', {localSearch=searchLocalLaws}={}) {
-  if (interpretCasualMessage(message)?.standalone) return [];
+  const route = questionRoute(message, history);
+  if (route.kind !== 'legal') return [];
+  if (route.context) message = `${route.context}\n${message}`;
   const { retrievalQuery, topic } = interpretLegalQuestion(message, history);
   try {
     const vat = vatQuestion(message, history);

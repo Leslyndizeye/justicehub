@@ -17,6 +17,7 @@ import {unsupportedArticleCitations,unsupportedFilingPeriod,sourceReadingReply} 
 import {referencesForQuestion} from './legalReferences.js';
 import {evidenceResponseFormat,validateEvidenceAnswer,renderEvidenceAnswer} from './evidenceAnswer.js';
 import {prepareEvidenceRequest} from './evidenceRequest.js';
+import { questionRoute, scopeReply, insufficientSourcesReply } from './questionRouting.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -119,6 +120,18 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         if (streaming) onEvent('token', { text: greeting });
         return greeting;
       }
+      const route = questionRoute(message, history);
+      if (route.kind === 'unrelated') {
+        const reply = scopeReply(language);
+        if (streaming) onEvent('token', { text: reply });
+        return reply;
+      }
+      // Ignore even caller-supplied PDF context for social/unclear requests.
+      if (route.kind !== 'legal') legalDocs = [];
+      const pdfFirst = (legalDocs || []).some(doc => doc.coverage && lawExcerptMetadata(doc));
+      // A dated PDF cannot establish today's law or a later amendment.
+      const currentVerification = /\b(?:latest|current|today|now|in force|still appl\w*|202[5-9]|new laws?|amend\w*|updated?|recent|agezweho|mashya|vuba|aujourd'hui|actuel\w*|modifi\w*|recent\w*)\b/i.test(message);
+      let needsResearch = route.kind === 'legal' && (!pdfFirst || currentVerification);
       const referencedAnswer = incomeTaxExemptionsAnswer(message, legalDocs, language)
         || vatOverviewAnswer(message, legalDocs, language)
         || referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language);
@@ -139,15 +152,15 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
           rateLimits.push({ model: candidate, retryAfterSeconds: Math.ceil((cooldown.until - now()) / 1000) });
           continue;
         }
-        if (externalSearch && !externalSearchResult) {
+        if (needsResearch && externalSearch && !externalSearchResult) {
           onEvent('status', { text: copy.search, webSearch: false });
           externalSearchResult = await externalSearch.lookup({ message, history, signal, onFallback: () => onEvent('status', { text: copy.searchFallback, webSearch: false }) });
           signal?.throwIfAborted();
           onEvent('status', { text: externalSearchNotice(externalSearchResult, language).trim() || (externalSearchResult.status === 'ok' ? externalSearchResult.provider === 'groq' ? copy.searchFallbackUsed : copy.search : ''), webSearch: ['ok', 'cached'].includes(externalSearchResult.status) });
         }
         if (index > 0) onEvent('status', { text: copy.fallback, webSearch: false });
-        for (let attempt = 0; attempt < 2; attempt++) {
-          const recoveredLookup = attempt > 0;
+        let recoveredLookup = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
           const lookupNotice = externalSearch ? externalSearchNotice(externalSearchResult, language) : copy.lookupNotice;
           const showLookupNotice = externalSearch ? Boolean(lookupNotice) : recoveredLookup;
           const search = createSearchTracker({ language });
@@ -159,10 +172,10 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
           const bundle=prepared?.bundle;
           const request = {
             model: candidate,
-            messages: prepared?.messages || buildChatMessages({ message, role, ...context, evidenceMode, correction, replyLanguage: language, externalSearchResult, searchEnabled: !externalSearch && !recoveredLookup && webSearchEnabled(candidate, searchSetting), now: new Date(now()), instructionRole: gptOss ? 'developer' : 'system' }),
+            messages: prepared?.messages || buildChatMessages({ message, role, ...context, evidenceMode, correction, replyLanguage: language, externalSearchResult, searchEnabled: needsResearch && !externalSearch && !recoveredLookup && webSearchEnabled(candidate, searchSetting), now: new Date(now()), instructionRole: gptOss ? 'developer' : 'system' }),
             temperature: evidenceMode ? 0.1 : 0.4,
             max_completion_tokens: 2048,
-            ...(evidenceMode ? {response_format:evidenceResponseFormat(bundle)} : externalSearch ? { tool_choice: 'none' } : !recoveredLookup ? searchOptions(candidate, message, searchSetting) : {}),
+            ...(evidenceMode ? {response_format:evidenceResponseFormat(bundle)} : externalSearch || !needsResearch ? { tool_choice: 'none' } : !recoveredLookup ? searchOptions(candidate, message, searchSetting) : {}),
             ...(gptOss ? { reasoning_effort: ['low', 'medium', 'high'].includes(reasoningEffort) ? reasoningEffort : 'medium', include_reasoning: false } : {}),
           };
           const requestTimeout = AbortSignal.timeout(requestTimeoutMs);
@@ -180,10 +193,24 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
               const completion=await client.chat.completions.create({...request,stream:false},{signal:requestSignal});
               signal?.throwIfAborted();
               const result=validateEvidenceAnswer(completion.choices?.[0]?.message?.content || '',bundle,message,language);
-              let reply=result.ok ? renderEvidenceAnswer(result,language) : sourceReadingReply(context.legalDocs,language,message);
+              if (!result.ok && result.reason === 'insufficient' && externalSearch && !externalSearchResult && attempt < 2) {
+                // A retrieved PDF is not proof that it answers this question.
+                // Try external evidence once only after the PDF-only draft
+                // reports insufficient support; no draft has been published.
+                needsResearch = true;
+                onEvent('status', { text: copy.search, webSearch: false });
+                externalSearchResult = await externalSearch.lookup({ message, history, signal,
+                  onFallback: () => onEvent('status', { text: copy.searchFallback, webSearch: false }) });
+                signal?.throwIfAborted();
+                onEvent('status', { text: '', webSearch: ['ok', 'cached'].includes(externalSearchResult.status) });
+                if (externalSearchResult.sources?.length) continue;
+              }
+              let reply=result.ok ? renderEvidenceAnswer(result,language)
+                : result.reason === 'insufficient' ? insufficientSourcesReply(language)
+                  : sourceReadingReply(context.legalDocs,language,message);
               const conflicts=vocabularyIssues(message,history,reply);
               if(conflicts.length)reply=correctedVocabularyReply({message,history,language,issues:conflicts});
-              if(bundle.research)reply=externalSearchNotice(bundle.research,language)+reply;
+              if(bundle.research || externalSearchResult)reply=externalSearchNotice(bundle.research || externalSearchResult,language)+reply;
               if(streaming)onEvent('token',{text:reply});
               cooldowns.delete(candidate);
               return reply;
@@ -268,7 +295,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
             signal?.throwIfAborted();
             if(error.status===413) {
               error.code='request_too_large';
-              if(evidenceMode && !recoveredLookup && !emittedText)continue;
+              if(evidenceMode && !recoveredLookup && !emittedText && attempt < 2) { recoveredLookup = true; continue; }
             }
             const failure = providerFailure(error, translatingDraft ? translationTimeout?.aborted : requestTimeout.aborted);
             error.chatPhase = translatingDraft ? 'translation' : 'answer';
@@ -277,6 +304,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
             // general guidance, without repeating the failed lookup or publishing an unverified draft.
             if (!emittedText && !recoveredLookup && !translatingDraft && request.tools?.length && (requestTimeout.aborted || errorDetails(error).code === 'context_length_exceeded')) {
               onEvent('status', { text: copy.lookupRecovery, webSearch: false });
+              recoveredLookup = true;
               continue;
             }
             if (error.name === 'AbortError' && !failure) throw error;

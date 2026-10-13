@@ -36,7 +36,7 @@ test('rate limits switch to a web-capable fallback and avoid the cooling-down mo
       yield token('See [Official news](https://news.example/story).');
     })();
   }) });
-  const first = await provider.reply({ message: 'latest news', streaming: true, signal: signal(), onEvent: (name, data) => events.push([name, data]) });
+  const first = await provider.reply({ message: 'latest legal news', streaming: true, signal: signal(), onEvent: (name, data) => events.push([name, data]) });
   assert.match(first, /Official news/);
   assert.deepEqual(calls.map(request => request.model), [main, fallback]);
   assert.deepEqual(calls[1].tools, [{ type: 'browser_search' }]);

@@ -1,18 +1,26 @@
 import { interpretLegalQuestion } from './legalQuestion.js';
 import { interpretCasualMessage } from '../shared/chatCasual.js';
 import { vatQuestion } from './legalTaxTopic.js';
+import { questionRoute } from './questionRouting.js';
 
-const legalWords = /\b(?:law\w*|legal|penalt\w*|sentenc\w*|bail|rights|tax\w*|employment|land|constitution|lois?|juridique|droits|impôts|amategeko|icyaha|igihano|uburenganzira|imisoro|umusoro|ubutaka|akazi|ahanish\w*)\b/i;
 const currentWords = /\b(?:latest|current|recent|today|news|new|updates?|amend\w*|actualités|récentes?|dernières?|nouvelles|aujourd'hui|mashya|vuba|uyu munsi|agezweho|amakuru|202[5-9])\b/i;
 const topics = [
   [/\b(?:tax\w*|impôts|fiscales?|imisoro|umusoro|VAT)\b/i, 'tax'],
   [/\b(?:employment|labou?r|akazi)\b/i, 'employment labour'],
+  [/\b(?:child|children|kids?).*(?:work|employ)|\b(?:salary|wages?|employer|employee|dismissal|maternity)\b/i, 'employment labour'],
+  [/\b(?:refund|consumer|unsafe food|expired|defective)\b/i, 'consumer protection'],
+  [/\b(?:landlord|tenant|eviction|rent|lease)\b/i, 'tenancy lease'],
+  [/\b(?:contract|agreement|amasezerano)\b/i, 'contracts'],
+  [/\b(?:marriage|divorce|inheritance|child support)\b/i, 'family'],
   [/\b(?:land|ubutaka)\b/i, 'land'],
   [/\b(?:privacy|data protection)\b/i, 'data protection'],
 ];
 
 /** Never send a client's account/name/case description to the search provider. */
 export function publicSearchPlan(message, history = []) {
+  const route = questionRoute(message, history);
+  if (route.kind !== 'legal') return null;
+  if (route.context) message = `${route.context}\n${message}`;
   if (interpretCasualMessage(message)?.standalone) return null;
   if (/^(?:hello|hi|hey+|yoo+|muraho|mwiriwe|mwaramutse|thanks|murakoze)[!.?\s]*$/i.test(message.trim())) return null;
   if (/\b(?:your purpose|my name|remember about me|izina ryanjye|uranyibuka)\b/i.test(message)) return null;
@@ -29,17 +37,9 @@ export function publicSearchPlan(message, history = []) {
       if (topic || item.content.length > 120) break;
     }
   }
-  const legal = Boolean(topic || legalWords.test(message));
-  if (!legal && !currentWords.test(message)) return null;
-  if (legal) {
-    const identifiers = [...message.matchAll(/\b(?:law|itegeko)\s*(?:no\.?|n[°º])?\s*(\d{1,3}\/20\d{2})\b/gi)].map(match => match[1]);
-    const penalty = /penalt|sentenc|punish|ahanish|igihano/i.test(message) ? ' penalties sentencing' : '';
-    return { query: `Rwanda ${topic || 'law'}${penalty} ${identifiers.join(' ')}${currentWords.test(message) ? ' latest laws amendments' : ''}`.replace(/\s+/g, ' ').trim(), legal: true, topic: 'general' };
-  }
-  // Generic news questions may keep their public topic. Personal, credential,
-  // quoted, and case-like content gets a broad query instead of being disclosed.
-  const privateText = /\b(?:my|our|client|passport|password|token|email|nitwa|umukiliya)\b|@|\d{5,}|gsk_|tvly-|```|["“”]|https?:\/\//i.test(message);
-  return { query: privateText ? 'latest Rwanda news' : message.slice(0, 240), legal: false, topic: /news|amakuru/i.test(message) ? 'news' : 'general' };
+  const identifiers = [...message.matchAll(/\b(?:law|itegeko)\s*(?:no\.?|n[°º])?\s*(\d{1,3}\/20\d{2})\b/gi)].map(match => match[1]);
+  const penalty = /penalt|sentenc|punish|ahanish|igihano/i.test(message) ? ' penalties sentencing' : '';
+  return { query: `Rwanda ${topic || 'law'}${penalty} ${identifiers.join(' ')}${currentWords.test(message) ? ' latest laws amendments' : ''}`.replace(/\s+/g, ' ').trim(), legal: true, topic: 'general' };
 }
 
 function title(text) { return String(text || '').replace(/[\[\]\\\r\n\x00-\x1f]/g, ' ').trim().slice(0, 140); }

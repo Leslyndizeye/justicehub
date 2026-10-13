@@ -64,7 +64,7 @@ test('legal searches preserve topic and explicit law numbers without sending per
   assert.equal(publicSearchPlan('hello'), null);
   assert.equal(publicSearchPlan('What is your purpose?'), null);
   assert.equal(publicSearchPlan('Please explain React components.'), null);
-  assert.equal(publicSearchPlan('latest news about my client, account 123456').query, 'latest Rwanda news');
+  assert.equal(publicSearchPlan('latest news about my client, account 123456'), null);
   assert.match(publicSearchPlan('Quelles sont les dernières lois fiscales au Rwanda ?').query, /tax.*latest/);
 });
 

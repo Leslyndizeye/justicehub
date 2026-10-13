@@ -59,9 +59,9 @@ test('413 causes one smaller source-checked retry with no repeat search and no q
   const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',externalSearch:{async lookup(){lookups++;return research;}},client:{chat:{completions:{async create(request){
     requests.push(request);
     if(requests.length===1)throw Object.assign(new Error('Sensitive upstream details'),{status:413,error:{code:'rate_limit_exceeded'}});
-    return {choices:[{message:{content:JSON.stringify({status:'insufficient',points:[]})}}]};
+    return {choices:[{message:{content:JSON.stringify({status:'answered',points:[{kind:'rule',statement:'Article 16 lists payments excluded from taxable employment income under specified conditions.',evidence:[{source_id:'P1',quote:docs[0].content.split('\n').slice(2).join('\n').trim(),paragraph:null}]}]})}}]};
   }}}}});
-  const reply=await provider.reply({message:modelQuestion,legalDocs:docs,history:[],replyLanguage:'en',streaming:true,onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
+  const reply=await provider.reply({message:modelQuestion+' under current law',legalDocs:docs,history:[],replyLanguage:'en',streaming:true,onEvent:(event,data)=>{if(event==='token')events.push(data.text);}});
   assert.equal(requests.length,2);assert.equal(lookups,1);
   const size=request=>request.messages.reduce((sum,item)=>sum+item.content.length,0);
   assert.ok(size(requests[1])<size(requests[0]));
