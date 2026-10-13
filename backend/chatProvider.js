@@ -20,6 +20,7 @@ import {prepareEvidenceRequest} from './evidenceRequest.js';
 import { questionRoute, scopeReply, insufficientSourcesReply } from './questionRouting.js';
 import { inferQuestionRoute } from './questionUnderstanding.js';
 import { employmentAgeAnswer } from './employmentAgeAnswer.js';
+import {reusableLawExplanation,createLawExplanationCache} from './lawExplanationCache.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -110,6 +111,7 @@ export function boundedContext(history = [], legalDocs = []) {
 
 export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-oss-20b', searchSetting, externalSearch, reasoningEffort = 'medium', requestTimeoutMs = 30000, now = Date.now }) {
   const cooldowns = new Map();
+  const lawExplanations = createLawExplanationCache();
   const models = [...new Set([model, fallbackModel].filter(value => value && value !== 'none'))];
   return {
     async understand({ message, history = [], signal }) {
@@ -163,6 +165,26 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         if (streaming) onEvent('token', { text: referencedAnswer });
         return referencedAnswer;
       }
+      const reusableKey = !needsResearch && !route.context && !correction
+        ? reusableLawExplanation(message, legalDocs || [], language, role) : null;
+      // Reusable article questions contain only public source identifiers.
+      // Omit earlier case history before generation so no private facts can
+      // enter an explanation later reused for another account.
+      const answerHistory = reusableKey ? [] : history;
+      if (reusableKey) {
+        const prepared = prepareEvidenceRequest({message,role,history:[],legalDocs,routing:route,language,now:new Date(now())});
+        const raw = lawExplanations.get(reusableKey);
+        if (raw) {
+          const checked = validateEvidenceAnswer(raw, prepared.bundle, message, language);
+          if (checked.ok) {
+            signal?.throwIfAborted();
+            const reply = renderEvidenceAnswer(checked, language);
+            if (streaming) onEvent('token', {text:reply});
+            return reply;
+          }
+          lawExplanations.delete(reusableKey);
+        }
+      }
       let lastError;
       let earliestRetry = Infinity;
       const rateLimits = [];
@@ -191,7 +213,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
           const showLookupNotice = externalSearch ? Boolean(lookupNotice) : recoveredLookup;
           const search = createSearchTracker({ language });
           const gptOss = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(candidate);
-          let context=boundedContext(reviewedVocabularyHistory(history),legalDocs);
+          let context=boundedContext(reviewedVocabularyHistory(answerHistory),legalDocs);
           const evidenceMode=gptOss && context.legalDocs.some(doc=>doc.coverage && lawExcerptMetadata(doc));
           const prepared=evidenceMode ? prepareEvidenceRequest({message,role,...context,routing:route,language,correction,research:externalSearchResult,now:new Date(now()),repairReason},recoveredLookup) : null;
           if(prepared)context=prepared.context;
@@ -243,6 +265,10 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
                   : sourceReadingReply(context.legalDocs,language,message);
               const conflicts=vocabularyIssues(message,history,reply);
               if(conflicts.length)reply=correctedVocabularyReply({message,history,language,issues:conflicts});
+              if (result.ok && !conflicts.length && reusableKey && !externalSearchResult && result.points.every(point=>point.kind==='rule'
+                && point.evidence.every(item=>item.source.kind==='pdf'))) {
+                lawExplanations.set(reusableKey, completion.choices[0].message.content);
+              }
               if(bundle.research || externalSearchResult)reply=externalSearchNotice(bundle.research || externalSearchResult,language)+reply;
               if(streaming)onEvent('token',{text:reply});
               cooldowns.delete(candidate);
