@@ -4,6 +4,7 @@ import {interpretLegalQuestion} from './legalQuestion.js';
 import {unsupportedArticleCitations,unsupportedFilingPeriod} from './lawGrounding.js';
 import {needsTranslation} from './chatTranslation.js';
 import {legalApplicationIssue} from './legalApplicationGuard.js';
+import {isReviewedStatute} from './criminalProvisions.js';
 
 const normalize=text=>String(text).normalize('NFKC').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[\u2010\u2011]/g,'-').replace(/([\p{L}])-\s+(?=[\p{L}])/gu,'$1-').replace(/\s+/g,' ').trim().toLowerCase();
 const cleanLabel=text=>String(text||'').replace(/[\[\]\\\r\n]/g,' ').slice(0,180);
@@ -12,7 +13,7 @@ export function evidenceBundle(message,history,legalDocs,externalResult) {
   const sources=[];
   const docs=legalDocs.map((doc,index)=>{
     const id=`P${index+1}`;const metadata=lawExcerptMetadata(doc);
-    sources.push({id,doc,kind:'pdf',text:String(doc.content).split('\n').slice(2).join('\n'),metadata});
+    sources.push({id,doc,kind:isReviewedStatute(doc)?'reviewed':'pdf',text:isReviewedStatute(doc)?doc.content:String(doc.content).split('\n').slice(2).join('\n'),metadata});
     return {...doc,evidenceId:id};
   });
   for(const [index,doc] of referencesForQuestion(interpretLegalQuestion(message,history)).entries())sources.push({id:`R${index+1}`,doc,kind:'reviewed',text:doc.content});
@@ -62,6 +63,8 @@ export function evidenceRepairInstruction(reason) {
     exemption_conflict:'The explanation confused an exemption with a zero rate.',
     scope_connection:'A general civil principle was stretched into a conclusion about conduct, breach or criminal liability. Establish the legal scope and factual connection; use needs_context for missing facts or insufficient for missing authority.',
     offence_support:'An offence was named without its own supporting provision and relevant elements. Remove the unsupported charge or provide its actual quoted authority; a general civil principle is not criminal authority.',
+    conviction_condition:'A penalty was described without its conviction condition. State explicitly in each penalty point that the person must be convicted or found guilty. Keep the distinction between intentional killing and a death caused by negligence without intent; an accident alone does not establish an offence.',
+    penalty_conditions:'Preserve the statutory penalty conditions. Article 174 combines the prison term AND fine, not optional alternatives. Its separate securities clause uses a fine MORE THAN five million, not an inclusive five-million lower bound. Do not volunteer this separate clause for an ordinary baseline question.',
     language:'The explanation was not in the requested language.',
     length:'The explanation exceeded the word limit.',
   }[reason] || 'The previous draft failed a source or format check.';
@@ -110,6 +113,12 @@ export function validateEvidenceAnswer(raw,bundle,message,language) {
         evidence.push({entry,source});
       }
       const quoted=evidence.map(item=>item.entry.quote).join('\n');
+      if(evidence.some(item=>isReviewedStatute(item.source.doc))
+        && /imprison|prison|fine\b|FRW|emprison|amende|igifungo|ihazabu/i.test(point.statement)
+        && !/convict|found guilty|court finds|uhamijwe|abihamijwe|reconn\w*\s+coupable|condamn/i.test(point.statement))return {ok:false,reason:'conviction_condition'};
+      if(evidence.some(item=>isReviewedStatute(item.source.doc)&&item.source.doc.articleNumber===174)
+        && (/and\/or|prison\s+or|or\s+(?:a\s+)?fine/i.test(point.statement)
+          || /fine.{0,30}more than five million/i.test(normalize(quoted)) && !/more than|over|exceed|plus de|arenze/i.test(point.statement)))return {ok:false,reason:'penalty_conditions'};
       const applicationIssue=legalApplicationIssue(point,evidence);
       if(applicationIssue)return {ok:false,reason:applicationIssue};
       if(point.statement.trim().length>=60 && evidence.some(item=>normalize(item.entry.quote).includes(normalize(point.statement))))return {ok:false,reason:'explanation'};

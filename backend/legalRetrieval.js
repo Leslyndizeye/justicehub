@@ -8,6 +8,7 @@ import {searchLocalLaws} from './localLawSearch.js';
 import { questionRoute } from './questionRouting.js';
 import { orientationRoute } from '../shared/everydayQuestions.js';
 import { questionWording } from '../shared/questionWording.js';
+import { searchCriminalProvisions } from './criminalProvisions.js';
 
 const noise = new Set('a an the is are was were be been being of in on for to at and or with from by as it this that these those me my you your i we our us please explain tell show understand what which how why when about law laws rwanda rwandan article articles no number latest current english french kinyarwanda under relating governing says does do should could would rwo bya ibyo kuri ni iki gute amategeko mbwira'.split(' '));
 const catalogue = new Map(lawCatalog.documents.map(doc=>[doc.key,doc]));
@@ -54,7 +55,7 @@ export function rankLegalDocuments(documents, message, topic, language = 'en') {
   }).slice(0,4);
 }
 
-export async function searchLegalDocs(client, message, history = [], language = 'en', {localSearch=searchLocalLaws,resolvedRoute}={}) {
+export async function searchLegalDocs(client, message, history = [], language = 'en', {localSearch=searchLocalLaws,criminalSearch=searchCriminalProvisions,resolvedRoute}={}) {
   const route = resolvedRoute || questionRoute(message, history);
   if (route.kind !== 'legal' || orientationRoute(route)) return [];
   message = questionWording(message).normalized;
@@ -62,6 +63,8 @@ export async function searchLegalDocs(client, message, history = [], language = 
   if (route.researchTopic) message += `\nLegal research topic: ${route.researchTopic}`;
   const { retrievalQuery, topic } = interpretLegalQuestion(message, history);
   try {
+    const criminal = criminalSearch(message, history);
+    if (criminal.length) return criminal;
     const vat = vatQuestion(message, history);
     const namedLaw = String(message).match(/\b(?:law|loi|itegeko|tegeko)\s*(?:(?:no\.?|n[º°o]?\.?|number)\s*)?(\d{1,3})\/((?:19|20)\d{2})/i);
     // A recognized VAT question must not fall back to unrelated tax/Constitution

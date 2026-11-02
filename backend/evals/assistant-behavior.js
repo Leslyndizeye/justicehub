@@ -11,6 +11,38 @@ import { chatErrorDiagnostic } from '../chatDiagnostics.js';
 
 const cases = [
   {
+    id: 'conversation_discussion_fraud',
+    message: 'what do u think about fraud',
+    check(reply) {
+      assert.match(reply,/decei|decep|dishonest|mislead|trick/i);
+      assert.match(reply,/harm|trust|loss|unfair/i);
+      assert.doesNotMatch(reply,/couldn.t establish|unrelated article|Article \d|Law\s*68|imprison|fine\b|civil claim|illegal|offen[cs]e|search.*(?:verified|completed)/i);
+    },
+  },
+  {
+    id: 'conversation_homicide_penalty',
+    message: 'what someone can be  punished by',
+    history: [{sender:'user',content:'what do u think about fraud'}, {sender:'ai',content:'Fraud can cause harm and damage trust.'},
+      {sender:'user',content:'so what do u think about the person killing another person'},
+      {sender:'ai',content:'A deliberate attack, an accident and an act claimed as self-defence need different legal analysis. Are you asking generally, about the law in Rwanda, or about a real incident?'}],
+    check(reply) {
+      assert.match(reply,/Article 107/); assert.match(reply,/intentional|intentionally/i);
+      assert.match(reply,/life imprisonment|life in prison/i); assert.match(reply,/#page=110/);
+      assert.match(reply,/In plain language/); assert.match(reply,/convict/i);
+      assert.doesNotMatch(reply,/Article 197|Grounds for case review|couldn.t establish|FRW 3,000,000|supported explanation.*not produced/);
+    },
+  },
+  {
+    id: 'conversation_fraud_penalty',
+    message: 'What punishment can follow a conviction for fraud in Rwanda?',
+    check(reply) {
+      assert.match(reply,/Article 174/); assert.match(reply,/convict/i);
+      assert.match(reply,/In plain language/);
+      assert.match(reply,/#page=161/);
+      assert.doesNotMatch(reply,/Article 197|Grounds for case review|couldn.t establish|supported explanation.*not produced/);
+    },
+  },
+  {
     id: 'everyday_feelings',
     message: 'i am in love with someone is it legal in rwanda',
     check(reply) {
@@ -175,7 +207,7 @@ const cases = [
 ];
 
 const selectedId = process.argv[2];
-const selected = selectedId ? cases.filter(item => selectedId === 'everyday' ? item.id.startsWith('everyday_') : item.id === selectedId) : cases;
+const selected = selectedId ? cases.filter(item => ['everyday','conversation'].includes(selectedId) ? item.id.startsWith(`${selectedId}_`) : item.id === selectedId) : cases;
 if (!selected.length) throw new Error(`Choose a case: ${cases.map(item => item.id).join(', ')}`);
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
 const provider = createChatProvider({

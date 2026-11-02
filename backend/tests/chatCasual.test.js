@@ -63,7 +63,7 @@ test('mixed greetings preserve the substantive request, sources, identifiers and
   assert.match(messages.at(-1).content, /https:\/\/example.com\/C/);
   assert.match(messages.at(-1).content, /`char c = 1;`/);
   let query;
-  await searchLegalDocs({ from() { return { select() { return { textSearch(column, value) { query = value; return { limit: async () => ({ data: [] }) }; } }; } }; } }, message);
+  await searchLegalDocs({ from() { return { select() { return { textSearch(column, value) { query = value; return { limit: async () => ({ data: [] }) }; } }; } }; } }, message, [], 'en', {criminalSearch:()=>[]});
   assert.match(query, /fraud|swindl/i);
   let calls = 0;
   const provider = createChatProvider({ model: 'openai/gpt-oss-120b', client: { chat: { completions: { create: async request => {

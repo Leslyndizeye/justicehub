@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "law": "68/2018",
+  "published": "2018-09-27",
+  "reviewedOn": "2026-11-02",
+  "source": "https://www.minijust.gov.rw/fileadmin/user_upload/Minijust/Publications/Laws/Offences_and_penalties_in_general_2018.pdf",
+  "sha256": "612eb87c993653a08d867a339bd9b7861b658b1f6d32a9ed7b2ecd1b18ce682e",
+  "language": "en",
+  "articles": [
+    {
+      "number": 107,
+      "pages": [
+        110
+      ],
+      "topic": "murder",
+      "text": "Article 107: Voluntary murder and its\npunishment\nA person who intentionally kills another\nperson commits murder. Upon conviction,\nhe/ she is liable to life imprisonment"
+    },
+    {
+      "number": 111,
+      "pages": [
+        111,
+        112
+      ],
+      "topic": "murder",
+      "text": "Article 111: Manslaughter and its\npunishment\nAny person who kills another as a result of\nclumsiness, carelessness, inattention,\nnegligence, failure to observe rules or any\nother lack of precaution and foresight but\nwithout intent to kill him/her, commits an\noffence.\nA person convicted of manslaughter is\nliable to imprisonment for a term of not less\nthan six (6) months and not more than two\n(2) years and a fine of not less than five\nhundred thousand Rwandan francs (FRW\n500,000) and not more than two million\nRwandan francs ( FRW 2,000,000) or only\none of these penalties."
+    },
+    {
+      "number": 174,
+      "pages": [
+        161
+      ],
+      "topic": "fraud",
+      "text": "Article 174: Fraud\nAny person who, by deception, obtains\nanother person’s property, whole or part of\nhis/her finance by use of false names or\nqualifications, or who offers positive\npromises or who threatens of future\nmisfortunes, commits an offence.\nUpon conviction, he/she is liable to\nimprisonment for a term of not less than two\n(2) years and not more than three (3) years,\nand a fine of not less than three million\nRwandan francs (FRW 3,000,000) and not\nmore than five million Rwandan francs\n(FRW 5,000,000).\nIf this offence is committed by a person\nwho intends to issue shares, shareholders’\nbills, securities, bonds, vouchers or any\nother cash value, either for a business\ncompany, trading company or industry, the\napplicable penalty is an imprisonment for a\nterm of not less than three (3) years and not\nmore than five (5) years with a fine of more\nthan five million Rwandan francs (FRW\n5,000,000) and not more than seven million\nRwandan francs (FRW 7,000,000)."
+    }
+  ],
+  "extractionNotes": "English column only; page headers and footers removed; line whitespace normalized. The split word property was reconciled against the published text."
+}

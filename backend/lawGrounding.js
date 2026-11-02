@@ -1,11 +1,13 @@
 import {lawExcerptMetadata,excerptArticles} from './lawArticles.js';
 import {readLawArticles} from './lawArticleReader.js';
+import {asksPenalty} from './legalQuestion.js';
+import {isReviewedStatute} from './criminalProvisions.js';
 
 export function unsupportedArticleCitations(text, excerpts, externalSearchResult) {
   // External research can legitimately introduce a different law/article.
   // This local check makes no claim to validate that external interpretation.
-  if(externalSearchResult?.sources?.length || !excerpts.some(doc=>lawExcerptMetadata(doc)))return [];
-  const supported=new Set(excerpts.flatMap(doc=>excerptArticles(doc)));
+  if(externalSearchResult?.sources?.length || !excerpts.some(doc=>lawExcerptMetadata(doc) || isReviewedStatute(doc)))return [];
+  const supported=new Set(excerpts.flatMap(doc=>isReviewedStatute(doc)?[doc.articleNumber]:excerptArticles(doc)));
   for(const excerpt of excerpts) {
     for(const match of String(excerpt.content).matchAll(/\b(?:Article|Ingingo(?:\s+ya)?)\s+(\d{1,4})\b/gi))supported.add(Number(match[1]));
   }
@@ -27,12 +29,16 @@ export function sourceReadingReply(excerpts, language, question='') {
     const metadata=lawExcerptMetadata(doc);
     return metadata && doc.articleNumber ? readLawArticles(metadata.key,metadata.language).find(article=>article.number===doc.articleNumber)?.segments[0]?.text.split('\n')[0] || '' : '';
   };
-  const candidates=excerpts.map(doc=>({doc,body:String(doc.content).split('\n').slice(2).join('\n').trim()}))
+  const penalty = asksPenalty(question) && !/\b(?:review|appeal|procedure|bail|mitigat\w*)\b/i.test(question);
+  const candidates=excerpts.map(doc=>({doc,body:isReviewedStatute(doc)?doc.content:String(doc.content).split('\n').slice(2).join('\n').trim()}))
+    .filter(item=>!penalty || /\b(?:liable\s+to|punish(?:ed|able)|penalt(?:y|ies)\s+(?:is|are|of|shall)|ahanish\w*|puni\w*|peine\w*)\b/i.test(item.body.replace(/\s+/g,' ')))
+    .filter(item=>!penalty || !/^(?:Article\s+\d+:\s*)?(?:grounds for|request for|application for).*(?:review|appeal)/i.test(item.body.replace(/\s+/g,' ')))
     .filter(item=>item.body.length>=30 && (meaning || !background.test(heading(item.doc) || item.body.split('\n')[0])));
   const score=text=>words.reduce((sum,word)=>sum+(text.toLowerCase().includes(word)?1:0),0);
   candidates.sort((a,b)=>score(b.body)-score(a.body));
   const selected=candidates[0];
   if(!selected) {
+    if(penalty)return {en:'These passages do not establish the punishment for that act. Which act or offence are you asking about? You can describe it in your own words.',rw:'Ibi bice by’inyandiko ntibigaragaza igihano cy’icyo gikorwa. Ni iki cyakozwe ushaka kumenya igihano cyacyo? Ushobora kugisobanura mu magambo yawe.',fr:'Ces passages n’établissent pas la peine pour cet acte. De quel acte ou de quelle infraction parlez-vous ? Vous pouvez le décrire avec vos propres mots.'}[language] || 'Which act are you asking about?';
     // A broad query returning only definitions cannot establish a case-specific
     // rule. Ask for the topic instead of dumping unrelated clipped paragraphs.
     const labour=excerpts.some(doc=>lawExcerptMetadata(doc)?.key==='law-66-2018');

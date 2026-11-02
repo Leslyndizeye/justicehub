@@ -5,6 +5,7 @@ import { isCorrectionRequest } from './chatCorrection.js';
 import { employmentAgeQuestion } from './employmentAgeTopic.js';
 import { everydayQuestionRoute } from '../shared/everydayQuestions.js';
 import { questionWording } from '../shared/questionWording.js';
+import { asksPenalty, isPenaltyFollowup } from './legalQuestion.js';
 
 const fold = text => String(text || '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
 const legalWords = /\b(?:laws?|legal|legally|illegal|rights?|responsibilit\w*|courts?|judges?|lawyers?|advocates?|attorneys?|justice|constitution|contracts?|agreements?|tax\w*|paye|vat|tva|income|employment|employers?|employees?|labou?r|salary|wages?|dismiss\w*|fired|severance|overtime|maternity|maternitty|termination|apprentice|tenan\w*|landlord|rent\w*|evict\w*|deposit|land|property|ownership|inherit\w*|divorc\w*|marriage|custody|child support|fraud|scam\w*|theft|steal\w*|stolen|robbery|rape|assault|threat\w*|harass\w*|abuse|consent|discriminat\w*|arrest\w*|bail|prison|sentenc\w*|penalt\w*|punish\w*|prohibit\w*|evidence|summon\w*|appeal\w*|lawsuit|complaint|licen[cs]\w*|permit|authoris\w*|authoriz\w*|privacy|data protection|cybercrime|hacking|phishing|copyright|trademark|refund|consumer|compensation|damages|defence|defense|crime|criminal|offence|offense|police|rib|parliament|bar association|bar internal|amategeko|itegeko|tegeko|ingingo|uburenganzira|inshingano|icyaha|ibyaha|ibihano|igihano|umusoro|imisoro|akazi|umukozi|umukoresha|umushahara|kwirukan\w*|ubutaka|amasezerano|ubukode|ubujura|gutubur\w*|gufata\s*ku\s*ngufu|uburiganya|ubwicanyi|ahanish\w*|urukiko|inkiko|ikirego|avoka|kubyara|lois?|juridique|droits?|avocats?|tribunal|impots?|emploi|travail|salaire|licenci\w*|locataire|bailleur|contrat|divorce|plainte|peine|vol|viol|escroquer\w*|autorisation)\b/i;
@@ -33,6 +34,19 @@ export function questionRoute(message, history = []) {
   const previousUser = [...history].reverse().find(turn => turn.sender === 'user' && typeof turn.content === 'string');
   if (fictionalTopic.test(text) || (previousUser && fictionalTopic.test(fold(previousUser.content))
     && /\b(?:he|him|his|character|show|series|story)\b/i.test(text))) return { kind: 'unclear' };
+  // Resolve referential punishment questions before the generic legal-keyword
+  // gate. An earlier assistant article is never an anchor or legal authority.
+  if (isPenaltyFollowup(text)) {
+    const previous = [...history].reverse().find(turn => turn.sender === 'user' && typeof turn.content === 'string'
+      && !isPenaltyFollowup(turn.content) && !followup.test(fold(turn.content)) && !onlineFollowup.test(fold(turn.content)));
+    const earlier = previous && questionRoute(previous.content);
+    if (['legal', 'discussion'].includes(earlier?.kind)) return { kind: 'legal', context: previous.content };
+    return { kind: 'unclear' };
+  }
+  const discussion = /^(?:so\s+)?(?:what (?:do|would) (?:you|u) think|how do (?:you|u) feel|what(?:'s| is) your (?:view|opinion)|what are your thoughts)\s+(?:about|on|of)\s+/.exec(text);
+  const specifics = /\b(?:article|section|law|legal|illegal|penalt\w*|punish\w*|sentenc\w*|fine|deadline|current|latest|today|my|our|i|he|she|they|his|her|their|client|case|if|how|can|should|could|help|report\w*|avoid|evad\w*|commit\w*|charged|convict\w*|police|court)\b|\d|[;\n]/.test(text.slice(discussion?.[0].length || 0));
+  if (discussion && text.length <= 150 && !specifics && !requestsOnlineSearch(message)
+    && (legalWords.test(text) || matchedLegalVocabulary(message).some(entry => entry.topic))) return { kind: 'discussion' };
   if (employmentAgeQuestion(message)) return { kind: 'legal', researchTopic: 'employment labour child minimum age', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
   if (/\b(?:children|child|kids?|umwana|abana|enfant).*(?:work|akazi|gukora|travail)|\b(?:work|akazi|travail).*(?:children|child|kids?|umwana|abana|enfant)|\b(?:paid|bought).*(?:never|not|didn't|refus).*(?:deliver|receive|refund)|\b(?:minimum age).*(?:work|employ)/i.test(text)) return { kind: 'legal', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
   if (legalWords.test(text) || matchedLegalVocabulary(message).some(entry => entry.topic) || vatQuestion(message)) return { kind: 'legal', ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
@@ -46,7 +60,9 @@ export function questionRoute(message, history = []) {
     // PDF citation must never make the next message a legal request.
     const previous = [...history].reverse().find(item => item.sender === 'user' && typeof item.content === 'string' && !followup.test(fold(item.content)) && !onlineFollowup.test(fold(item.content)) && !isCorrectionRequest(item.content));
     const earlierRoute = previous && questionRoute(previous.content);
-    if (earlierRoute?.kind === 'legal') return { kind: 'legal', context: previous.content, ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
+    if ((earlierRoute?.kind === 'discussion' || earlierRoute?.intent === 'violence_discussion') && followup.test(text)
+      && !asksPenalty(message) && !requestsOnlineSearch(message) && !/\b(?:legal|allowed|rights?)\b/i.test(message)) return {kind:'discussion',context:previous.content};
+    if (['legal', 'discussion'].includes(earlierRoute?.kind)) return { kind: 'legal', context: previous.content, ...(requestsOnlineSearch(message) ? { forceWeb: true } : {}) };
     if (earlierRoute?.kind === 'social' && followup.test(text)) return { kind: 'social', context: previous.content };
     if (onlineFollowup.test(text) && earlierRoute?.kind === 'unrelated') return { kind: 'unrelated' };
   }
@@ -59,6 +75,7 @@ export function needsQuestionUnderstanding(message, route) {
   if (route.clarification || route.intent) return false;
   if (route.kind === 'unclear') return true;
   if (route.kind === 'legal' && questionWording(message).hints.length) return true;
+  if (route.kind === 'legal' && !route.context && asksPenalty(message) && !matchedLegalVocabulary(message).some(entry => entry.topic)) return true;
   return route.kind === 'legal' && !route.researchTopic && !route.context
     && /\b(?:laws?|legal|illegal|allowed|rights?)\b/i.test(message)
     && !/\b(?:article|ingingo|constitution|tax|vat|paye|employment|labou?r|salary|dismissal|marriage|divorce|contract|rent|landlord|tenant|land|property|theft|fraud|rape|assault|bail|arrest|court|privacy|cybercrime|lawyer|licen[cs]e|permit)\b/i.test(message);

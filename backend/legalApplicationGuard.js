@@ -1,5 +1,6 @@
 // Narrow checks for observed scope/charge errors. Authentic quotations alone
 // do not prove an interpretation; this is not a general entailment verifier.
+import {isReviewedStatute} from './criminalProvisions.js';
 const fold=text=>String(text).normalize('NFKD').replace(/\p{M}/gu,'').replace(/[‘’]/g,"'").replace(/\s+/g,' ').toLowerCase();
 const offences=[
   {claim:/\b(?:fraud|escroquerie)\b|icyaha cy['’ ]?uburiganya/i,support:/\b(?:fraud|escroquer\w*|false pretences?|swindl\w*)\b|kwihesha.*uburiganya/i},
@@ -28,7 +29,15 @@ export function legalApplicationIssue(point,evidence) {
     if(!sentences.some(sentence=>offence.claim.test(sentence) && !limitation(sentence)))continue;
     // Support must occur in this point's own quotation, not an unrelated
     // article elsewhere in the draft or the user's allegation.
-    if(!evidence.some(item=>offence.support.test(fold(item.entry.quote)) && legalEffect.test(fold(item.entry.quote))))return 'offence_support';
+    if(!evidence.some(item=>{
+      const quote=fold(item.entry.quote);
+      if(offence.support.test(quote) && legalEffect.test(quote))return true;
+      // A verified article's own penalty paragraph need not repeat its offence
+      // heading. Never borrow a heading from another article or a civil rule.
+      const article=item.source.doc;
+      return isReviewedStatute(article) && offence.support.test(fold(article.content.split('\n').slice(0,2).join(' ')))
+        && legalEffect.test(fold(article.content)) && /imprison|fine|penalt|emprison|amende|igifungo|ihazabu/i.test(quote);
+    }))return 'offence_support';
   }
   if(!evidence.length || !evidence.every(generalCivilPrinciple))return null;
   for(const sentence of sentences) {

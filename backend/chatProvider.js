@@ -23,6 +23,8 @@ import { inferQuestionRoute } from './questionUnderstanding.js';
 import { employmentAgeAnswer } from './employmentAgeAnswer.js';
 import {reusableLawExplanation,createLawExplanationCache} from './lawExplanationCache.js';
 import {applicationClarification} from './legalApplicationGuard.js';
+import {isReviewedStatute} from './criminalProvisions.js';
+import {generalDiscussionIssue} from './generalDiscussion.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -178,11 +180,11 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       }
       // Ignore even caller-supplied PDF context for social/unclear requests.
       if (route.kind !== 'legal') legalDocs = [];
-      const pdfFirst = (legalDocs || []).some(doc => doc.coverage && lawExcerptMetadata(doc));
+      const pdfFirst = (legalDocs || []).some(doc => doc.coverage && lawExcerptMetadata(doc) || isReviewedStatute(doc));
       // A dated PDF cannot establish today's law or a later amendment.
       const currentVerification = /\b(?:latest|current|today|now|in force|still appl\w*|202[5-9]|new laws?|amend\w*|updated?|recent|agezweho|mashya|vuba|aujourd'hui|actuel\w*|modifi\w*|recent\w*)\b/i.test(message);
       let needsResearch = route.kind === 'legal' && (!pdfFirst || currentVerification || route.forceWeb);
-      const referencedAnswer = !route.forceWeb && (employmentAgeAnswer(message, legalDocs, language)
+      const referencedAnswer = route.kind === 'legal' && !route.forceWeb && (employmentAgeAnswer(message, legalDocs, language)
         || incomeTaxExemptionsAnswer(message, legalDocs, language)
         || vatOverviewAnswer(message, legalDocs, language)
         || referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language));
@@ -217,6 +219,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       let externalSearchResult;
       let evidenceRepairUsed = false;
       let repairReason;
+      let discussionRepairUsed = false;
       for (const [index, candidate] of models.entries()) {
         signal?.throwIfAborted();
         const cooldown = cooldowns.get(candidate);
@@ -239,7 +242,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
           const search = createSearchTracker({ language });
           const gptOss = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(candidate);
           let context=boundedContext(reviewedVocabularyHistory(answerHistory),legalDocs);
-          const evidenceMode=gptOss && context.legalDocs.some(doc=>doc.coverage && lawExcerptMetadata(doc));
+          const evidenceMode=gptOss && context.legalDocs.some(doc=>doc.coverage && lawExcerptMetadata(doc) || isReviewedStatute(doc));
           const prepared=evidenceMode ? prepareEvidenceRequest({message,role,...context,routing:route,language,correction,research:externalSearchResult,now:new Date(now()),repairReason},recoveredLookup) : null;
           if(prepared)context=prepared.context;
           const bundle=prepared?.bundle;
@@ -247,15 +250,16 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
             model: candidate,
             messages: prepared?.messages || buildChatMessages({ message, role, ...context, routing:route, evidenceMode, correction, replyLanguage: language, externalSearchResult, searchEnabled: needsResearch && !externalSearch && !recoveredLookup && webSearchEnabled(candidate, searchSetting), now: new Date(now()), instructionRole: gptOss ? 'developer' : 'system' }),
             temperature: evidenceMode ? 0.1 : 0.4,
-            max_completion_tokens: 2048,
+            max_completion_tokens: route.kind === 'discussion' ? 512 : 2048,
             ...(evidenceMode ? {response_format:evidenceResponseFormat(bundle)} : externalSearch || !needsResearch ? { tool_choice: 'none' } : !recoveredLookup ? searchOptions(candidate, message, searchSetting) : {}),
-            ...(gptOss ? { reasoning_effort: ['low', 'medium', 'high'].includes(reasoningEffort) ? reasoningEffort : 'medium', include_reasoning: false } : {}),
+            ...(gptOss ? { reasoning_effort: route.kind === 'discussion' ? 'low' : ['low', 'medium', 'high'].includes(reasoningEffort) ? reasoningEffort : 'medium', include_reasoning: false } : {}),
           };
+          if (route.kind === 'discussion' && discussionRepairUsed) request.messages[0].content += '\nRepair the previous failure: give only a short ordinary explanation and ethical view. Remove statutory claims, consequences, authorities and legal steps. No legal sources or penalty was requested.';
           const requestTimeout = AbortSignal.timeout(requestTimeoutMs);
           const requestSignal = signal ? AbortSignal.any([signal, requestTimeout]) : requestTimeout;
           let text = '';
           const bufferLanguage = ['rw', 'fr'].includes(language);
-          const reviewVocabulary = needsVocabularyReview(message, history) || (legalDocs || []).some(doc=>lawExcerptMetadata(doc));
+          const reviewVocabulary = route.kind === 'discussion' || needsVocabularyReview(message, history) || (legalDocs || []).some(doc=>lawExcerptMetadata(doc));
           let releasedDraft = false;
           let translatingDraft = false;
           let translationTimeout;
@@ -289,7 +293,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
                 : ['needs_context','scope_connection'].includes(result.reason) ? applicationClarification(message,language)
                 : result.reason === 'insufficient' ? insufficientSourcesReply(language)
                 : result.reason === 'offence_support' ? insufficientSourcesReply(language)
-                  : sourceReadingReply(context.legalDocs,language,message);
+                  : sourceReadingReply(context.legalDocs,language,[route.context,message].filter(Boolean).join('\n'));
               const conflicts=vocabularyIssues(message,history,reply);
               if(conflicts.length)reply=correctedVocabularyReply({message,history,language,issues:conflicts});
               if (result.ok && !conflicts.length && reusableKey && !externalSearchResult && result.points.every(point=>point.kind==='rule'
@@ -331,6 +335,10 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
               text = answer?.content || '';
             }
             signal?.throwIfAborted();
+            if (route.kind === 'discussion' && generalDiscussionIssue(text)) {
+              if (!discussionRepairUsed && attempt < 3) { discussionRepairUsed = true; continue; }
+              throw Object.assign(new Error('The general discussion could not be completed reliably.'), {status:502,code:'unverified_discussion'});
+            }
             let issues = vocabularyIssues(message, history, text);
             if (issues.length) {
               const safeReply = correctedVocabularyReply({ message, history, language, issues });
@@ -358,7 +366,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
             const sourceContext=boundedContext([],legalDocs).legalDocs;
             const suppliedReferences=[...sourceContext,...referencesForQuestion(interpretLegalQuestion(message,history))];
             if(unsupportedArticleCitations(text,suppliedReferences,externalSearchResult).length || unsupportedFilingPeriod(text,sourceContext,externalSearchResult)) {
-              const safeReply=sourceReadingReply(sourceContext,language,message);
+              const safeReply=sourceReadingReply(sourceContext,language,[route.context,message].filter(Boolean).join('\n'));
               if(streaming)onEvent('token',{text:safeReply});
               cooldowns.delete(candidate);
               return safeReply;

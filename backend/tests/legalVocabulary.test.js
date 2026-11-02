@@ -96,7 +96,7 @@ test('retrieval favors a fraud document over an unrelated passing mention', asyn
     assert.match(query, /fraud OR swindling/);
     return { limit: async count => { assert.equal(count, 16); return { data: [unrelated, fraud] }; } };
   } }; } }; } };
-  assert.deepEqual(await searchLegalDocs(client, 'gutubura'), [fraud, unrelated]);
+  assert.deepEqual(await searchLegalDocs(client, 'gutubura', [], 'en', {criminalSearch:()=>[]}), [fraud, unrelated]);
 });
 
 test('service and payment context identifies documented bribery euphemisms', () => {
