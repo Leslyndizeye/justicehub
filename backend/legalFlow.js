@@ -62,3 +62,18 @@ export function taskEvidenceScore(text,task) {
   const patterns={penalty:/liable|punish|penalt|ahanish|igihano|passible|puni/gi,deadline:/within|before|time limit|deadline|days?|months?|delai|iminsi|amezi/gi,procedure:/application|submit|file|complaint|notify|procedure|request|demande|gusaba/gi,eligibility:/entitled|eligible|conditions|requirements|qualif|exempt|bisonewe/gi,remedy:/compensation|damages|appeal|review|reinstat|indemni|ubujurire/gi};
   return Math.min(4,(String(text).match(patterns[task]||/$a/g)||[]).length);
 }
+export function flowSearchTerms(message,task) {
+  const text=fold(message);
+  if(['procedure','remedy','deadline','eligibility'].includes(task)&&/appeal|objection|contest|review|ubujurire|recours/.test(text))return ['appeal','objection','review'];
+  return {penalty:['penalty','fine','punishment'],deadline:['deadline','time','limit'],procedure:['application','procedure','submission'],eligibility:['conditions','eligibility'],remedy:['remedy','compensation','damages'],amount:['rate','fee','amount','threshold']}[task]||[];
+}
+export function taskClarification(task,language='en') {
+  const copy={
+    penalty:{en:'Which action or missed obligation are you asking about? Describe what someone did or failed to do, in your own words.',fr:'De quel acte ou de quelle obligation non respectée parlez-vous ? Décrivez simplement ce qui a été fait ou omis.',rw:'Urabaza ku kihe gikorwa cyangwa inshingano itubahirijwe? Sobanura mu magambo yawe icyakozwe cyangwa icyirengagijwe.'},
+    deadline:{en:'Which filing, payment, decision or appeal is this about, and when did the relevant event happen?',fr:'De quel dépôt, paiement, décision ou recours s’agit-il, et quand l’événement concerné a-t-il eu lieu ?',rw:'Ni ubuhe busabe, ubwishyu, icyemezo cyangwa ubujurire uvuga, kandi ibyabaye bifitanye isano na byo byabaye ryari?'},
+    amount:{en:'Which rate, fee or amount do you mean, and what transaction or period does it concern?',fr:'De quel taux, frais ou montant parlez-vous, et pour quelle opération ou période ?',rw:'Urabaza ku kihe gipimo cyangwa amafaranga, kandi bireba ikihe gikorwa cyangwa igihe?'},
+    procedure:{en:'What action do you want to take, and what stage have you reached?',fr:'Quelle démarche souhaitez-vous entreprendre, et à quelle étape en êtes-vous ?',rw:'Ni iki ushaka gukora, kandi ugeze ku yihe ntambwe?'},
+    eligibility:{en:'Who is applying or seeking the benefit, and what relevant circumstances should I consider?',fr:'Qui demande l’accès ou l’avantage, et quelles circonstances pertinentes faut-il prendre en compte ?',rw:'Ni nde usaba cyangwa ushaka kugenerwa ibivugwa, kandi ni ibihe bimureba ngomba kwitaho?'},
+  };
+  return copy[task]?.[language]||copy[task]?.en||null;
+}

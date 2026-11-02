@@ -25,6 +25,7 @@ import {reusableLawExplanation,createLawExplanationCache} from './lawExplanation
 import {applicationClarification} from './legalApplicationGuard.js';
 import {isReviewedStatute} from './criminalProvisions.js';
 import {generalDiscussionIssue} from './generalDiscussion.js';
+import {taskClarification} from './legalFlow.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -290,7 +291,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
                 if (externalSearchResult.sources?.length) continue;
               }
               let reply=result.ok ? renderEvidenceAnswer(result,language)
-                : ['needs_context','scope_connection'].includes(result.reason) ? applicationClarification(message,language)
+                : ['needs_context','scope_connection'].includes(result.reason) ? taskClarification(route.answerTask,language)||applicationClarification(message,language)
                 : result.reason === 'insufficient' ? insufficientSourcesReply(language)
                 : result.reason === 'offence_support' ? insufficientSourcesReply(language)
                   : sourceReadingReply(context.legalDocs,language,[route.context,message].filter(Boolean).join('\n'));

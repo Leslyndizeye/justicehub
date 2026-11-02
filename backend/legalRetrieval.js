@@ -102,7 +102,7 @@ export async function searchLegalDocs(client, message, history = [], language = 
     const namedLaw = String(message).match(/\b(?:law|loi|itegeko|tegeko)\s*(?:(?:no\.?|n[º°o]?\.?|number)\s*)?(\d{1,3})\/((?:19|20)\d{2})/i);
     // A recognized VAT question must not fall back to unrelated tax/Constitution
     // passages because its everyday spelling is absent from the English index.
-    if (vat && !['penalty','remedy'].includes(route.answerTask) && (!namedLaw || Number(namedLaw[1]) === 49 && namedLaw[2] === '2023')) {
+    if (vat && !['penalty','remedy','procedure','comparison','application'].includes(route.answerTask) && (!namedLaw || Number(namedLaw[1]) === 49 && namedLaw[2] === '2023')) {
       const desiredLocal=vatFocusArticles(vat);
       const local=desiredLocal.flatMap(article=>localLookup(`Law No. 049/2023 article ${article}`,[],language).slice(0,1));
       if(local.length)return local.slice(0,4);

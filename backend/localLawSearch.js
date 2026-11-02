@@ -3,7 +3,7 @@ import {readLawArticles,expandLawArticles} from './lawArticleReader.js';
 import {interpretLegalQuestion} from './legalQuestion.js';
 import {interpretCasualMessage} from '../shared/chatCasual.js';
 import {employmentAgeQuestion} from './employmentAgeTopic.js';
-import {taskEvidenceScore} from './legalFlow.js';
+import {taskEvidenceScore,flowSearchTerms} from './legalFlow.js';
 
 const noise=new Set('a an the to of and or in on for is are was were it this that those what how why when which please explain tell me about under law laws article articles no ya mu ni ku kuri iki ki avuga rivuga amategeko itegeko mbwira rwanda rwandan en le la les de des du loi au does do can could should would my your i we have with person people umuntu'.split(' '));
 const hints=[
@@ -72,6 +72,8 @@ export function searchLocalLaws(message,history=[],language='en',{answerTask,all
   const interpretation=interpretLegalQuestion(message,history);
   if(interpretation.topic && !scope.length)return [];
   const query=[...new Set(tokens(text+' '+(interpretation.topic?interpretation.retrievalQuery:'')+' '+selected.flatMap(item=>item[1]).join(' ')))].slice(0,24);
+  const taskTerms=flowSearchTerms(message,answerTask);
+  for(const term of taskTerms)if(!query.includes(term))query.push(term);
   if(!query.length && !articleNumber && !explicitKey)return [];
   const {records,frequencies,averageLength}=searchIndex();
   const ranked=[];
@@ -95,11 +97,12 @@ export function searchLocalLaws(message,history=[],language='en',{answerTask,all
     // Keep them fully available when the user actually asks about their meaning.
     const background=/definitions|scope of|purpose of|ibisobanuro|ibirebwa|intego|d[eé]finitions|champ d.application|objet de/i;
     if(background.test(heading) && !/defin|meaning|mean\b|scope|appl(?:y|ies) to|purpose|bisobanur|ibirebwa|intego|signifi|champ d.application/i.test(text))score*=.18;
-    const definitionRequested=/defin|meaning|mean\b|what is|bisobanur|signifi/i.test(text);
+    const definitionRequested=(!answerTask||answerTask==='explanation')&&/defin|meaning|mean\b|what is|bisobanur|signifi/i.test(text);
     const intentPriority=definitionRequested && /definitions|ibisobanuro|d[eé]finitions/i.test(heading) ? 1 : 0;
     if(/insolven|ubwishyu.*buke/i.test(heading) && !/insolven|bankrupt|ubwishyu.*buke/i.test(text))score*=.25;
     score+=(record.article.language===language?2:record.article.language==='en'?1:0);
     score+=taskEvidenceScore(record.text,answerTask);
+    score+=taskTerms.reduce((sum,term)=>sum+(heading.includes(term)?14:0),0);
     if(articleNumber)score+=30;
     ranked.push({record,score,intentPriority});
   }
