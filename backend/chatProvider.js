@@ -70,8 +70,26 @@ export function retryDelaySeconds(error, time = Date.now()) {
   return valid.length ? Math.max(...valid) : 60;
 }
 
-export function publicChatError(error, language = 'en') {
+export function publicChatError(error, language = 'en', stage = 'generate') {
   const copy = languageCopy(language);
+  const databaseStages = ['create_session', 'load_session', 'load_history', 'save_user', 'save_reply', 'update_session'];
+  if (databaseStages.includes(stage)) {
+    const code = stage === 'save_reply' ? 'reply_not_saved' : stage === 'save_user' ? 'message_not_saved' : 'conversation_unavailable';
+    const messages = code === 'reply_not_saved' ? {
+      en: 'Your answer could not be saved. Copy it before leaving this conversation.',
+      rw: 'Igisubizo nticyashoboye kubikwa. Gikoporore mbere yo kuva muri iki kiganiro.',
+      fr: 'Votre réponse n’a pas pu être enregistrée. Copiez-la avant de quitter cette conversation.',
+    } : code === 'message_not_saved' ? {
+      en: 'Your message could not be saved. Please try again shortly.',
+      rw: 'Ubutumwa bwawe ntibwashoboye kubikwa. Ongera ugerageze mu kanya.',
+      fr: 'Votre message n’a pas pu être enregistré. Réessayez dans un instant.',
+    } : {
+      en: 'Your conversation could not be opened right now. Please try again shortly.',
+      rw: 'Ikiganiro cyawe nticyashoboye gufungurwa ubu. Ongera ugerageze mu kanya.',
+      fr: 'Votre conversation n’a pas pu être ouverte. Réessayez dans un instant.',
+    };
+    return { status: 503, code, error: messages[language] || messages.en };
+  }
   if(error.status===413 || error.code==='request_too_large')return {status:413,code:'request_too_large',error:({en:'This request is too large to answer at once. Try a shorter question or start a new conversation.',rw:'Iki kibazo ni kirekire cyane ngo gisubizwe icyarimwe. Gerageza ikibazo kigufi cyangwa utangire ikiganiro gishya.',fr:'Cette demande est trop longue pour une seule réponse. Essayez une question plus courte ou une nouvelle conversation.'})[language] || copy.genericError};
   const failure = error.chatFailure || providerFailure(error);
   if (failure === 'request_timeout') return { status: 504, code: failure, error: copy.timeoutError };

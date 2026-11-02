@@ -19,6 +19,7 @@ import { StatusPanel } from './StatusScreen';
 import DeleteConversationDialog from './DeleteConversationDialog';
 import { createAmbientRain } from '../lib/ambientRain.js';
 import { recoveryState, requestError } from '../lib/recoveryState.js';
+import { chatStatusLabel } from '../../shared/chatPresentation.js';
 
 const API = apiBaseUrl(import.meta.env.VITE_API_URL, import.meta.env.DEV);
 type ReplyLanguage = 'auto' | 'rw' | 'en' | 'fr';
@@ -518,7 +519,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
           setMessages(prev => prev.map(m => m.id === replyId ? { ...m, content: fullText } : m));
         }
         if (event === 'status' && typeof data.text === 'string') {
-          setMessages(prev => prev.map(m => m.id === replyId ? { ...m, status: data.text, webSearch: data.webSearch === true } : m));
+          setMessages(prev => prev.map(m => m.id === replyId ? { ...m, status: chatStatusLabel(data, responseLanguage), webSearch: data.webSearch === true } : m));
         }
       });
       if (streamRequest.current !== controller) return;
@@ -531,7 +532,10 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
       const stopped = controller.signal.aborted;
       const deadline = !stopped ? rateLimitDeadline(err) : 0;
       if (deadline && !blockedByCooldown) setRateLimit(previous => ({ until: Math.max(previous?.until || 0, deadline), language: responseLanguage }));
-      if (!stopped) console.error('Chat failed:', err);
+      if (!stopped && import.meta.env.DEV) console.warn('Chat request failed:', {
+        status: err instanceof Error && 'status' in err ? err.status : undefined,
+        code: err instanceof Error && 'code' in err ? err.code : undefined,
+      });
       setMessages(prev => prev.map(m => m.id === replyId ? {
         ...m, streaming: false, stopped,
         error: stopped ? undefined : chatFailureNotice(err, responseLanguage),
@@ -699,15 +703,14 @@ const MessageBubble: React.FC<{ message: Message; reader: ReturnType<typeof crea
       <div className={`chat-message-shell chat-message-shell--${m.sender}`}>
         {m.sender === 'ai' && <div className="chat-message-meta">
           <span>JusticeHub</span>
-          {(m.webSearch || (m.status && m.streaming && !m.content)) && <span role="status" className="font-normal text-legal-gold">{m.streaming && !m.content ? m.status : (m.replyLanguage === 'rw' ? 'Nashakishije kuri internet' : m.replyLanguage === 'fr' ? 'Recherche web effectuée' : 'Web search used')}</span>}
+          {m.webSearch && !m.streaming && <span className="font-normal text-legal-gold">{m.replyLanguage === 'rw' ? 'Nashakishije kuri internet' : m.replyLanguage === 'fr' ? 'Recherche web effectuée' : 'Web search used'}</span>}
         </div>}
         <div ref={contentElement} aria-busy={m.sender === 'ai' && writing} className={`chat-message-body chat-message-body--${m.sender}`}>
           {m.sender === 'ai' ? (
             <>
               {m.streaming && !visible ? (
-                <div role="status" className="flex items-center gap-2.5 py-2 text-sm text-neutral-400">
+                <div role="status" aria-label={m.status || chatStatusLabel(null, m.replyLanguage)} className="chat-response-pending">
                   <span className="flex gap-1" aria-hidden="true">{[0, 1, 2].map(i => <span key={i} className="h-1.5 w-1.5 rounded-full bg-legal-gold motion-safe:animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />)}</span>
-                  {m.replyLanguage === 'rw' ? 'Ndimo gutekereza…' : m.replyLanguage === 'fr' ? 'Je réfléchis…' : 'Thinking...'}
                 </div>
               ) : <ChatMarkdown content={visible} />}
               {visible && writing && <span aria-label="Writing response" className="mt-2 inline-block h-4 w-1.5 rounded-sm bg-legal-gold motion-safe:animate-pulse" />}

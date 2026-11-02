@@ -9,6 +9,18 @@ const fallback = 'openai/gpt-oss-20b';
 const api = create => ({ chat: { completions: { create } } });
 const externalSearch = { lookup: async () => ({ status: 'not_needed', sources: [] }) };
 
+test('database-stage errors distinguish opening, saving the message and saving a visible answer without exposing internals', () => {
+  const error = { message: 'private Supabase backend credentials', code: '42501' };
+  for (const language of ['en', 'rw', 'fr']) {
+    for (const [stage, code] of [['load_history', 'conversation_unavailable'], ['save_user', 'message_not_saved'], ['save_reply', 'reply_not_saved']]) {
+      const result = publicChatError(error, language, stage);
+      assert.equal(result.status, 503); assert.equal(result.code, code);
+      assert.doesNotMatch(result.error, /Supabase|credentials|42501|model|training/i);
+    }
+  }
+  assert.match(publicChatError(error, 'en', 'save_reply').error, /Copy it before leaving/);
+});
+
 test('connection and timeout diagnostics recognise actual SDK errors without logging sensitive contents', () => {
   const error = new APIConnectionError({ message: 'gsk_private tvly-private secret user case', cause: Object.assign(new Error('Bearer private'), { code: 'ECONNRESET' }) });
   error.stack = 'Error: private message\n at fail (C:\\Users\\private\\backend\\chatProvider.js:200:3)';

@@ -16,6 +16,7 @@ import { configuredCorsOrigins } from './corsConfig.js';
 import { configuredSpeechProvider } from './speechProvider.js';
 import { speechRouter } from './speechRoutes.js';
 import { createAccountAccessStore } from './accountAccessStore.js';
+import { chatStatusLabel } from '../shared/chatPresentation.js';
 
 const app = express();
 const allowedOrigins = configuredCorsOrigins(process.env.FRONTEND_URL);
@@ -347,7 +348,9 @@ app.post('/api/chat', async (req, res) => {
       message, role, history, legalDocs, routing, replyLanguage, streaming, signal: generation.signal,
       onEvent: (event, data) => {
         if (event === 'token') streamedReply += data.text;
-        if (streaming) sendEvent(event, data);
+        if (streaming) sendEvent(event, event === 'status'
+          ? { text: chatStatusLabel(data, replyLanguage), webSearch: data.webSearch === true }
+          : data);
       },
     });
 
@@ -390,7 +393,7 @@ app.post('/api/chat', async (req, res) => {
       }
       return;
     }
-    const publicError = publicChatError(err, replyLanguage);
+    const publicError = publicChatError(err, replyLanguage, chatStage);
     console.error('Chat error:', chatErrorDiagnostic(err, chatStage),
       ...(publicError.status === 429 ? [{ retryAfterSeconds: publicError.retryAfterSeconds, models: err?.rateLimits || [] }] : []));
     if (res.headersSent) {

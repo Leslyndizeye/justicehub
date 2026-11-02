@@ -1,3 +1,5 @@
+import { questionWording } from './questionWording.js';
+
 const fold = value => String(value || '').normalize('NFKD').replace(/\p{M}/gu, '').replace(/[‘’]/g, "'").toLowerCase().trim();
 const orientationIntents = new Set(['personal_feelings', 'wellbeing']);
 const feelingsWords = new Set('i im m am in love loving falling have romantic feelings crush on for with someone somebody a person is it that this legal illegal allowed okay ok wrong against the law to be rwanda rwandan please can you u tell me if'.split(' '));
@@ -6,7 +8,7 @@ const exampleWords = new Set('can could would you u please give tell show me us 
 // These narrow, model-free orientations make no finding about a relationship's
 // legality, a diagnosis, or a statutory offence. Specific facts need retrieval.
 export function everydayQuestionRoute(message, history = []) {
-  const text = fold(message);
+  const text = fold(questionWording(message).normalized);
   if (/\b(?:online|internet|interineti|google|browse)\b/.test(text)) return null;
   const feelings = /\b(?:in love|romantic feelings|falling in love|loving someone|love someone|love somebody|crush on someone)\b/.test(text)
     && (text.match(/[\p{L}\p{N}]+/gu) || []).every(word => feelingsWords.has(word));

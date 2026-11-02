@@ -54,3 +54,10 @@ test('account-access failures keep their safe code and do not masquerade as mode
   assert.match(chatFailureNotice(error, 'fr'), /compte/);
   assert.equal(chatReplyError({ code: 'private_database_detail' }).code, undefined);
 });
+
+test('a completed but unsaved answer offers copying instead of reporting a failed model response', () => {
+  const error = chatReplyError({ status: 503, code: 'reply_not_saved', error: 'Raw server diagnostics' });
+  assert.match(chatFailureNotice(error), /Copy it before leaving/);
+  assert.doesNotMatch(chatFailureNotice(error), /Raw|server|model|training/);
+  assert.match(chatFailureNotice(chatReplyError({ status: 503, code: 'message_not_saved' })), /message could not be saved/);
+});
