@@ -6,6 +6,8 @@ import { employmentAgeQuestion } from './employmentAgeTopic.js';
 import { everydayQuestionRoute } from '../shared/everydayQuestions.js';
 import { questionWording } from '../shared/questionWording.js';
 import { asksPenalty, isPenaltyFollowup } from './legalQuestion.js';
+import {legalFieldFor,fieldForTopic} from './legalTopics.js';
+import {legalFollowup,questionTask,conceptualDiscussion} from './legalFlow.js';
 
 const fold = text => String(text || '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
 const legalWords = /\b(?:laws?|legal|legally|illegal|rights?|responsibilit\w*|courts?|judges?|lawyers?|advocates?|attorneys?|justice|constitution|contracts?|agreements?|tax\w*|paye|vat|tva|income|employment|employers?|employees?|labou?r|salary|wages?|dismiss\w*|fired|severance|overtime|maternity|maternitty|termination|apprentice|tenan\w*|landlord|rent\w*|evict\w*|deposit|land|property|ownership|inherit\w*|divorc\w*|marriage|custody|child support|fraud|scam\w*|theft|steal\w*|stolen|robbery|rape|assault|threat\w*|harass\w*|abuse|consent|discriminat\w*|arrest\w*|bail|prison|sentenc\w*|penalt\w*|punish\w*|prohibit\w*|evidence|summon\w*|appeal\w*|lawsuit|complaint|licen[cs]\w*|permit|authoris\w*|authoriz\w*|privacy|data protection|cybercrime|hacking|phishing|copyright|trademark|refund|consumer|compensation|damages|defence|defense|crime|criminal|offence|offense|police|rib|parliament|bar association|bar internal|amategeko|itegeko|tegeko|ingingo|uburenganzira|inshingano|icyaha|ibyaha|ibihano|igihano|umusoro|imisoro|akazi|umukozi|umukoresha|umushahara|kwirukan\w*|ubutaka|amasezerano|ubukode|ubujura|gutubur\w*|gufata\s*ku\s*ngufu|uburiganya|ubwicanyi|ahanish\w*|urukiko|inkiko|ikirego|avoka|kubyara|lois?|juridique|droits?|avocats?|tribunal|impots?|emploi|travail|salaire|licenci\w*|locataire|bailleur|contrat|divorce|plainte|peine|vol|viol|escroquer\w*|autorisation)\b/i;
@@ -22,7 +24,7 @@ export const requestsOnlineSearch = message => onlineFollowup.test(fold(message)
 // This is a conservative routing gate, not a finding that an offence occurred.
 // An unclear request gets context before retrieval; a mere possible legal angle
 // to any everyday word must not manufacture a legal question.
-export function questionRoute(message, history = []) {
+function baseQuestionRoute(message, history = []) {
   const text = fold(questionWording(message).normalized);
   if (interpretCasualMessage(message)?.standalone || social.test(text) || introduction.test(text)) return { kind: 'social' };
   if (/\b(?:suicid\w*|kill myself|hurt myself|can't breathe|cannot breathe|medical emergency|in immediate danger)\b/i.test(text)) return { kind: 'safety' };
@@ -67,6 +69,38 @@ export function questionRoute(message, history = []) {
     if (onlineFollowup.test(text) && earlierRoute?.kind === 'unrelated') return { kind: 'unrelated' };
   }
   return { kind: 'unclear' };
+}
+
+// Field-independent conversation state is reconstructed from verified USER
+// turns on each request. No generated article or answer becomes legal evidence.
+export function questionRoute(message,history=[]) {
+  const route=baseQuestionRoute(message,history);
+  if(route.intent || route.clarification || ['social','safety','unrelated'].includes(route.kind))return route;
+  if(route.kind==='unclear'&&(fictionalTopic.test(message)||fictionalTopic.test(history.findLast(turn=>turn.sender==='user')?.content||'')))return route;
+  const followup=legalFollowup(message);
+  if(followup) {
+    const at=history.findLastIndex(turn=>turn.sender==='user'&&typeof turn.content==='string'
+      && !/^(?:thanks|thank you|ok|okay|murakoze|merci)[.!?\s]*$/i.test(turn.content));
+    if(at<0)return {kind:'unclear',answerTask:followup.answerTask};
+    const previous=history[at];const earlier=questionRoute(previous.content,history.slice(0,at));
+    if(!['legal','discussion'].includes(earlier.kind))return {kind:earlier.kind==='unrelated'&&followup.forceWeb?'unrelated':'unclear',answerTask:followup.answerTask};
+    const context=earlier.context || previous.content;
+    const field=fieldForTopic(earlier.researchTopic)||legalFieldFor(context);
+    const discussion=followup.answerTask==='explanation'&&(earlier.kind==='discussion'||earlier.intent==='violence_discussion');
+    return {kind:discussion?'discussion':'legal',context,answerTask:discussion?'discussion':followup.answerTask,
+      ...(earlier.researchTopic?{researchTopic:earlier.researchTopic}:field?{researchTopic:field.query}:{}),
+      ...(field?{field:field.id}:{}),...(followup.forceWeb?{forceWeb:true}:{})};
+  }
+  const field=fieldForTopic(route.researchTopic)||legalFieldFor(message);
+  if(field && conceptualDiscussion(message) && !requestsOnlineSearch(message))return {kind:'discussion',answerTask:'discussion',field:field.id,researchTopic:field.query};
+  // Recognising a field does not establish a legal request: "I enjoy farming"
+  // still needs semantic understanding instead of manufacturing a case.
+  const kind=route.kind;
+  return {...route,kind,...(['legal','discussion'].includes(kind)?{
+    answerTask:kind==='discussion'?'discussion':questionTask(message),
+    ...(field?{field:field.id,...(!route.researchTopic?{researchTopic:field.query}:{})}:{}),
+    ...(questionTask(message)==='current_verification'?{forceWeb:true}:{}),
+  }:{})};
 }
 
 // A generic legal keyword establishes scope, not the meaning of an informal

@@ -35,7 +35,8 @@ export function publicSearchPlan(message, history = [], routing) {
   }
   const identifiers = [...message.matchAll(/\b(?:law|itegeko)\s*(?:no\.?|n[°º])?\s*(\d{1,3}\/20\d{2})\b/gi)].map(match => match[1]);
   const penalty = /penalt|sentenc|punish|ahanish|igihano/i.test(message) ? ' penalties sentencing' : '';
-  return { query: `Rwanda ${topic || 'law'}${penalty} ${identifiers.join(' ')}${currentWords.test(message) ? ' latest laws amendments' : ''}`.replace(/\s+/g, ' ').trim(), legal: true, topic: 'general' };
+  const taskQueries={deadline:' time limit filing notification',amount:' rates fees thresholds',procedure:' application procedure competent authority',eligibility:' eligibility conditions exceptions',remedy:' remedies objection appeal review',comparison:' comparison scope conditions',source:' official legislation source',current_verification:' latest laws amendments'};
+  return { query: `Rwanda ${topic || 'law'}${penalty}${Object.hasOwn(taskQueries,route.answerTask)?taskQueries[route.answerTask]:''} ${identifiers.join(' ')}${currentWords.test(message) ? ' latest laws amendments' : ''}`.replace(/\s+/g, ' ').trim(), legal: true, topic: 'general' };
 }
 
 function title(text) { return String(text || '').replace(/[\[\]\\\r\n\x00-\x1f]/g, ' ').trim().slice(0, 140); }

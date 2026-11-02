@@ -3,6 +3,7 @@ import {readLawArticles,expandLawArticles} from './lawArticleReader.js';
 import {interpretLegalQuestion} from './legalQuestion.js';
 import {interpretCasualMessage} from '../shared/chatCasual.js';
 import {employmentAgeQuestion} from './employmentAgeTopic.js';
+import {taskEvidenceScore} from './legalFlow.js';
 
 const noise=new Set('a an the to of and or in on for is are was were it this that those what how why when which please explain tell me about under law laws article articles no ya mu ni ku kuri iki ki avuga rivuga amategeko itegeko mbwira rwanda rwandan en le la les de des du loi au does do can could should would my your i we have with person people umuntu'.split(' '));
 const hints=[
@@ -52,7 +53,7 @@ function searchIndex() {
   return index;
 }
 
-export function searchLocalLaws(message,history=[],language='en') {
+export function searchLocalLaws(message,history=[],language='en',{answerTask,allowedLawKeys}={}) {
   if(interpretCasualMessage(message)?.standalone)return [];
   let text=String(message);
   const lawNumber=value=>value.match(/\b(?:law|loi|itegeko)\s*(?:(?:no\.?|n[º°o]?\.?|number)\s*)?(\d{1,3})\/((?:19|20)\d{2})/i);
@@ -75,6 +76,7 @@ export function searchLocalLaws(message,history=[],language='en') {
   const {records,frequencies,averageLength}=searchIndex();
   const ranked=[];
   for(const record of records) {
+    if(allowedLawKeys&&!allowedLawKeys.includes(record.doc.key))continue;
     if(focusAge && (record.doc.key!=='law-66-2018' || ![5,6].includes(record.article.number)))continue;
     if(scope.length && !scope.includes(record.doc.key))continue;
     if(selected[0]?.[3] && !selected[0][3].test(record.text))continue;
@@ -97,6 +99,7 @@ export function searchLocalLaws(message,history=[],language='en') {
     const intentPriority=definitionRequested && /definitions|ibisobanuro|d[eé]finitions/i.test(heading) ? 1 : 0;
     if(/insolven|ubwishyu.*buke/i.test(heading) && !/insolven|bankrupt|ubwishyu.*buke/i.test(text))score*=.25;
     score+=(record.article.language===language?2:record.article.language==='en'?1:0);
+    score+=taskEvidenceScore(record.text,answerTask);
     if(articleNumber)score+=30;
     ranked.push({record,score,intentPriority});
   }

@@ -9,6 +9,8 @@ import { questionRoute } from './questionRouting.js';
 import { orientationRoute } from '../shared/everydayQuestions.js';
 import { questionWording } from '../shared/questionWording.js';
 import { searchCriminalProvisions } from './criminalProvisions.js';
+import {sourceField,fieldLawKeys} from './lawCoverage.js';
+import {legalFieldsIn} from './legalTopics.js';
 
 const noise = new Set('a an the is are was were be been being of in on for to at and or with from by as it this that these those me my you your i we our us please explain tell show understand what which how why when about law laws rwanda rwandan article articles no number latest current english french kinyarwanda under relating governing says does do should could would rwo bya ibyo kuri ni iki gute amategeko mbwira'.split(' '));
 const catalogue = new Map(lawCatalog.documents.map(doc=>[doc.key,doc]));
@@ -61,17 +63,48 @@ export async function searchLegalDocs(client, message, history = [], language = 
   message = questionWording(message).normalized;
   if (route.context) message = `${route.context}\n${message}`;
   if (route.researchTopic) message += `\nLegal research topic: ${route.researchTopic}`;
+  const explicitLaw=/\b(?:law|loi|itegeko|tegeko)\s*(?:(?:no\.?|n[º°o]?\.?|number)\s*)?\d{1,3}\/(?:19|20)\d{2}/i.test(message);
+  const allowedKeys=explicitLaw?null:fieldLawKeys(sourceField(route),route.answerTask);
+  const allowedDocument=doc=>!allowedKeys||!lawExcerptMetadata(doc)||allowedKeys.includes(lawExcerptMetadata(doc).key);
+  const localLookup=(query,previous,lang)=>allowedKeys?.length===0?[]:localSearch(query,previous,lang,{answerTask:route.answerTask,allowedLawKeys:allowedKeys}).filter(allowedDocument);
   const { retrievalQuery, topic } = interpretLegalQuestion(message, history);
   try {
+    if(route.answerTask==='comparison') {
+      const references=[...message.matchAll(/\b(?:law|loi|itegeko)\s*(?:(?:no\.?|n[º°o]?\.?)\s*)?(\d{1,3})\/((?:19|20)\d{2})/gi)];
+      const requests=new Map();
+      for(const [index,match] of references.entries()) {
+        const identity=`${Number(match[1])}/${match[2]}`;
+        const before=message.slice(Math.max(0,match.index-45),match.index);
+        const after=message.slice(match.index+match[0].length,references[index+1]?.index);
+        const article=before.match(/\barticle\s+(\d+)\s*(?:of|under|de)?\s*$/i)?.[1] || after.match(/\barticle\s+(\d+)/i)?.[1];
+        requests.set(identity,`Law No. ${identity}${article?` article ${article}`:''}`);
+      }
+      if(requests.size<2)for(const field of legalFieldsIn(message))for(const key of field.lawKeys.slice(0,1)) {
+        const match=key.match(/^law-(\d+)-(\d+)$/);if(match)requests.set(`${match[1]}/${match[2]}`,`Law No. ${match[1]}/${match[2]}`);
+      }
+      if(requests.size>=2) {
+        const groups=[...requests.values()].slice(0,3).map(query=>{
+          const reviewed=criminalSearch(query,[]);
+          return reviewed.length?reviewed:localSearch(query,[],language,{answerTask:'comparison'});
+        });
+        const selected=[];const seen=new Set();
+        for(let position=0;position<2;position++)for(const group of groups) {
+          const doc=group[position];if(!doc)continue;
+          const key=`${doc.source}:${doc.articleNumber}`;
+          if(!seen.has(key)){selected.push(doc);seen.add(key);}
+        }
+        if(selected.length)return selected.slice(0,4);
+      }
+    }
     const criminal = criminalSearch(message, history);
     if (criminal.length) return criminal;
     const vat = vatQuestion(message, history);
     const namedLaw = String(message).match(/\b(?:law|loi|itegeko|tegeko)\s*(?:(?:no\.?|n[º°o]?\.?|number)\s*)?(\d{1,3})\/((?:19|20)\d{2})/i);
     // A recognized VAT question must not fall back to unrelated tax/Constitution
     // passages because its everyday spelling is absent from the English index.
-    if (vat && (!namedLaw || Number(namedLaw[1]) === 49 && namedLaw[2] === '2023')) {
+    if (vat && !['penalty','remedy'].includes(route.answerTask) && (!namedLaw || Number(namedLaw[1]) === 49 && namedLaw[2] === '2023')) {
       const desiredLocal=vatFocusArticles(vat);
-      const local=desiredLocal.flatMap(article=>localSearch(`Law No. 049/2023 article ${article}`,[],language).slice(0,1));
+      const local=desiredLocal.flatMap(article=>localLookup(`Law No. 049/2023 article ${article}`,[],language).slice(0,1));
       if(local.length)return local.slice(0,4);
       const {data, error} = await client.from('legal_documents').select('title, category, content, year, source')
         .like('content', '[Amategeko PDF: law-49-2023;%').limit(1000);
@@ -104,7 +137,7 @@ export async function searchLegalDocs(client, message, history = [], language = 
       }
       return expandLawArticles(selected.slice(0,4),message,{language,preferredArticles:vat.article ? selected.map(()=>vat.article) : desired});
     }
-    const local=localSearch(message,history,language);
+    const local=localLookup(message,history,language);
     if(local.length)return local;
     const law = String(message).match(/\b(?:law|loi|itegeko|tegeko)\s*(?:(?:no\.?|n[º°o]?\.?|number)\s*)?(\d{1,3})\/((?:19|20)\d{2})/i);
     const terms = legalSearchTerms(message);
@@ -130,7 +163,7 @@ export async function searchLegalDocs(client, message, history = [], language = 
         {type:'websearch',config:'english'}).order('year',{ascending:false}).limit(law?1000:128);
       if (!result.error) documents = [...documents,...(result.data || [])];
     }
-    const ranked=rankLegalDocuments(documents, message, topic, language);
+    const ranked=rankLegalDocuments(documents.filter(allowedDocument), message, topic, language);
     const article=String(message).match(/\b(?:article|i?ngingo\s*(?:ya)?)\s*(\d{1,3})\b/i)?.[1];
     return expandLawArticles(ranked,message,{language,preferredArticles:article ? ranked.map(()=>Number(article)) : []});
   } catch {

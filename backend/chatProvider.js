@@ -186,7 +186,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       let needsResearch = route.kind === 'legal' && (!pdfFirst || currentVerification || route.forceWeb);
       const referencedAnswer = route.kind === 'legal' && !route.forceWeb && (employmentAgeAnswer(message, legalDocs, language)
         || incomeTaxExemptionsAnswer(message, legalDocs, language)
-        || vatOverviewAnswer(message, legalDocs, language)
+        || ([undefined,'rule','explanation','amount'].includes(route.answerTask) && vatOverviewAnswer(message, legalDocs, language))
         || referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language));
       if (referencedAnswer) {
         if (streaming) onEvent('token', { text: referencedAnswer });
