@@ -30,7 +30,7 @@
 | Immigration and residence | no_local_primary_documents | Official research or source ingestion needed | No |
 | Nationality and civil status | published_documents | law-71-2024 (2024-07-30) | No |
 | Constitutional rights | published_documents | constitution-2023 (2023-08-04) | No |
-| Criminal offences and responsibility | no_local_primary_documents | Official research or source ingestion needed | No |
+| Criminal offences and responsibility | published_documents | law-59-2023 (2023-12-05) | No |
 | Homicide | selected_provisions_only | 68/2018 article 107 (2018-09-27); 68/2018 article 111 (2018-09-27) | No |
 | Fraud and scams | selected_provisions_only | 68/2018 article 174 (2018-09-27) | No |
 | Theft and robbery | no_local_primary_documents | Official research or source ingestion needed | No |

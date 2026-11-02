@@ -84,14 +84,17 @@ export function questionRoute(message,history=[]) {
     if(at<0)return {kind:'unclear',answerTask:followup.answerTask};
     const previous=history[at];const earlier=questionRoute(previous.content,history.slice(0,at));
     if(!['legal','discussion'].includes(earlier.kind))return {kind:earlier.kind==='unrelated'&&followup.forceWeb?'unrelated':'unclear',answerTask:followup.answerTask};
-    const context=earlier.context || previous.content;
+    const extendsContext=legalFollowup(previous.content)&&!earlier.forceWeb
+      && !['current_verification','source','explanation'].includes(earlier.answerTask);
+    const context=extendsContext && earlier.context && earlier.context!==previous.content
+      ? `${earlier.context}\n${previous.content}` : earlier.context || previous.content;
     const field=fieldForTopic(earlier.researchTopic)||legalFieldFor(context);
     const discussion=followup.answerTask==='explanation'&&(earlier.kind==='discussion'||earlier.intent==='violence_discussion');
     return {kind:discussion?'discussion':'legal',context,answerTask:discussion?'discussion':followup.answerTask,
       ...(earlier.researchTopic?{researchTopic:earlier.researchTopic}:field?{researchTopic:field.query}:{}),
       ...(field?{field:field.id}:{}),...(followup.forceWeb?{forceWeb:true}:{})};
   }
-  const field=fieldForTopic(route.researchTopic)||legalFieldFor(message);
+  const field=fieldForTopic(route.researchTopic)||(vatQuestion(message)?fieldForTopic('value added tax VAT'):legalFieldFor(message));
   if(field && conceptualDiscussion(message) && !requestsOnlineSearch(message))return {kind:'discussion',answerTask:'discussion',field:field.id,researchTopic:field.query};
   // Recognising a field does not establish a legal request: "I enjoy farming"
   // still needs semantic understanding instead of manufacturing a case.

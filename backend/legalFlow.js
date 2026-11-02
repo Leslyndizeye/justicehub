@@ -26,7 +26,7 @@ export function questionTask(message) {
   if(/\b(?:compare|difference between|bitandukaniye|difference entre)\b/.test(text))return 'comparison';
   if(/\b(?:cite|which law|law number|source for|source of that|where can i read)\b/.test(text))return 'source';
   if(/\b(?:penalt\w*|punish\w*|prison|jail|sentence|igihano|ibihano|ahanish\w*|peine)\b/.test(text))return 'penalty';
-  if(/\b(?:deadline|time limit|when must|how many days|delai|igihe ntarengwa)\b/.test(text))return 'deadline';
+  if(/\b(?:deadline|time limit|when must|how many days|how much notice|notice period|delai|igihe ntarengwa)\b/.test(text))return 'deadline';
   if(/\b(?:rate|rates|fee|fees|amount|threshold|percentage|how much|montant|taux)\b/.test(text))return 'amount';
   if(/\b(?:eligible|eligibility|qualif\w*|who can|requirements|conditions|bireba bande)\b/.test(text))return 'eligibility';
   if(/\b(?:how (?:do|can|should) i|procedure|process|documents|apply for|file a|report a|register|comment faire)\b/.test(text))return 'procedure';
@@ -65,6 +65,7 @@ export function taskEvidenceScore(text,task) {
 export function flowSearchTerms(message,task) {
   const text=fold(message);
   if(['procedure','remedy','deadline','eligibility'].includes(task)&&/appeal|objection|contest|review|ubujurire|recours/.test(text))return ['appeal','objection','review'];
+  if(task==='deadline'&&/\b(?:notice|notification|integuza|preavis)\b/.test(text))return ['notice','notification'];
   return {penalty:['penalty','fine','punishment'],deadline:['deadline','time','limit'],procedure:['application','procedure','submission'],eligibility:['conditions','eligibility'],remedy:['remedy','compensation','damages'],amount:['rate','fee','amount','threshold']}[task]||[];
 }
 export function taskClarification(task,language='en') {

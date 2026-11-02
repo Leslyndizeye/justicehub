@@ -8,7 +8,7 @@ export function sourceField(route) {
 export function fieldLawKeys(field,task) {
   if(!field)return null;
   const keys=[...field.lawKeys];
-  if(['vat','income_tax','tax','tax_procedure'].includes(field.id)&&['penalty','procedure','remedy'].includes(task))keys.push('law-20-2023');
+  if(['vat','income_tax','tax','tax_procedure'].includes(field.id)&&['penalty','deadline','procedure','eligibility','remedy'].includes(task))keys.push('law-20-2023');
   if(['employment','family'].includes(field.id)&&['procedure','remedy'].includes(task))keys.push('law-22-2018','law-30-2018');
   return [...new Set(keys)];
 }

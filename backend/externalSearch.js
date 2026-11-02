@@ -3,6 +3,7 @@ import { vatQuestion } from './legalTaxTopic.js';
 import { questionRoute } from './questionRouting.js';
 
 const currentWords = /\b(?:latest|current|recent|today|news|new|updates?|amend\w*|actualités|récentes?|dernières?|nouvelles|aujourd'hui|mashya|vuba|uyu munsi|agezweho|amakuru|202[5-9])\b/i;
+const taskQueries={deadline:' time limit filing notification',amount:' rates fees thresholds',procedure:' application procedure competent authority',eligibility:' eligibility conditions exceptions',remedy:' remedies objection appeal review',comparison:' comparison scope conditions',source:' official legislation source',current_verification:' latest laws amendments'};
 const topics = [
   [/\b(?:tax\w*|impôts|fiscales?|imisoro|umusoro|VAT)\b/i, 'tax'],
   [/\b(?:employment|labou?r|akazi)\b/i, 'employment labour'],
@@ -22,7 +23,12 @@ export function publicSearchPlan(message, history = [], routing) {
   if (route.context) message = `${route.context}\n${message}`;
   const interpretation = interpretLegalQuestion(message, history);
   const vat = vatQuestion(message, history);
-  if (vat || route.researchTopic === 'value added tax VAT') return {query:`Rwanda value added tax VAT law 049/2023 amendments${vat?.article ? ` article ${vat.article}` : ''}`, legal:true, legalTopic:'vat', topic:'general'};
+  if (vat || route.researchTopic === 'value added tax VAT') {
+    const appeal=/\b(?:appeal|objection|contest|review|ubujurire|recours)\b/i.test(message);
+    const administrative=appeal||['penalty','procedure','remedy'].includes(route.answerTask);
+    const action=appeal?' tax procedures objection appeal review':route.answerTask==='penalty'?' tax procedures administrative penalties sanctions':taskQueries[route.answerTask]||'';
+    return {query:`Rwanda value added tax VAT law 049/2023 amendments${vat?.article ? ` article ${vat.article}` : ''}${action}`,legal:true,legalTopic:administrative?'tax_procedure':'vat',topic:'general'};
+  }
   let topic = route.researchTopic || interpretation.topics.join(' ').replaceAll('_', ' ');
   if (!topic) topic = topics.find(([pattern]) => pattern.test(message))?.[1] || '';
   // A short current-law follow-up can refer to the latest user topic.
@@ -34,8 +40,8 @@ export function publicSearchPlan(message, history = [], routing) {
     }
   }
   const identifiers = [...message.matchAll(/\b(?:law|itegeko)\s*(?:no\.?|n[°º])?\s*(\d{1,3}\/20\d{2})\b/gi)].map(match => match[1]);
-  const penalty = /penalt|sentenc|punish|ahanish|igihano/i.test(message) ? ' penalties sentencing' : '';
-  const taskQueries={deadline:' time limit filing notification',amount:' rates fees thresholds',procedure:' application procedure competent authority',eligibility:' eligibility conditions exceptions',remedy:' remedies objection appeal review',comparison:' comparison scope conditions',source:' official legislation source',current_verification:' latest laws amendments'};
+  const penalty = route.answerTask==='penalty'||/penalt|sentenc|punish|ahanish|igihano/i.test(message)
+    ? ['tax','income_tax','tax_procedure','customs','excise','property_tax'].includes(route.field)?' administrative tax penalties sanctions':' penalties sentencing' : '';
   return { query: `Rwanda ${topic || 'law'}${penalty}${Object.hasOwn(taskQueries,route.answerTask)?taskQueries[route.answerTask]:''} ${identifiers.join(' ')}${currentWords.test(message) ? ' latest laws amendments' : ''}`.replace(/\s+/g, ' ').trim(), legal: true, topic: 'general' };
 }
 

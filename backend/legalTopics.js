@@ -41,7 +41,7 @@ export const legalFields = Object.freeze([
   ['banking','Banking and lending','banking lending financial regulation',['banking','bank loan','lending','credit agreement','bnr','banque'],[]],
   ['insurance','Insurance','insurance policy claims financial regulation',['insurance','insurance claim','assurance'],[]],
   ['payments','Payments and financial services','payments mobile money financial services',['mobile money','payment services','payment dispute','fintech'],[]],
-  ['procurement','Public procurement','public procurement tender review',['procurement','public tender','rp pa','rppa','isoko rya leta','marches publics'],[]],
+  ['procurement','Public procurement','public procurement tender review',['procurement','public tender','rppa','isoko rya leta','marches publics'],[]],
   ['administrative','Administrative and public service law','administrative decisions public service judicial review',['administrative law','administrative decision','public service','civil service','ombudsman','akarengane'],['law-22-2018']],
   ['immigration','Immigration and residence','immigration visa residence work permit',['immigration','visa','residence permit','work permit','refugee','asylum'],[]],
   ['nationality','Nationality and civil status','nationality citizenship civil status',['nationality','citizenship','naturalisation','naturalization','ubwenegihugu'],['law-71-2024']],
@@ -74,7 +74,7 @@ export const researchTopics=Object.freeze({...Object.fromEntries(legalFields.map
 const fold=value=>String(value).normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase();
 const escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 export function legalFieldsIn(message) {
-  const text=fold(message);const matches=[];
+  const text=fold(String(message).replace(/```[\s\S]*?```|`[^`]*`|https?:\/\/\S+|[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi,' '));const matches=[];
   for(const field of legalFields)for(const alias of field.aliases) {
     if(new RegExp(`(?:^|[^\\p{L}\\p{N}])${escape(fold(alias)).replace(/ /g,'\\s+')}(?=$|[^\\p{L}\\p{N}])`,'u').test(text))matches.push({field,score:alias.length});
   }

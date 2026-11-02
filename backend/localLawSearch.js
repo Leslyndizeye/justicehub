@@ -90,7 +90,7 @@ export function searchLocalLaws(message,history=[],language='en',{answerTask,all
       score+=idf*(count*2.2)/(count+1.2*(.25+.75*record.length/averageLength));
     }
     if(!matches && !articleNumber && !explicitKey)continue;
-    if(!scope.length && matches<Math.min(2,query.length))continue;
+    if(!scope.length && !allowedLawKeys?.length && matches<Math.min(2,query.length))continue;
     const heading=record.text.split('\n')[0].toLowerCase();
     for(const word of query)if(heading.includes(word))score+=2*Math.log(1+(records.length-(frequencies.get(word)||0)+.5)/((frequencies.get(word)||0)+.5));
     // Definitions/scope are background, not the operative rule for every case.
@@ -104,9 +104,12 @@ export function searchLocalLaws(message,history=[],language='en',{answerTask,all
     score+=taskEvidenceScore(record.text,answerTask);
     score+=taskTerms.reduce((sum,term)=>sum+(heading.includes(term)?14:0),0);
     if(articleNumber)score+=30;
-    ranked.push({record,score,intentPriority});
+    // Field relevance and the requested action are separate. For an appeal,
+    // prefer an appeal provision over a rate article that repeats "VAT".
+    const taskPriority=taskTerms.length && taskTerms.some(term=>record.terms.has(term)) ? 1 : 0;
+    ranked.push({record,score,intentPriority,taskPriority});
   }
-  ranked.sort((a,b)=>(focusAge ? a.record.article.number-b.record.article.number : 0) || b.intentPriority-a.intentPriority || b.score-a.score);
+  ranked.sort((a,b)=>(focusAge ? a.record.article.number-b.record.article.number : 0) || b.intentPriority-a.intentPriority || b.taskPriority-a.taskPriority || b.score-a.score);
   const seen=new Set();const seeds=[];const preferred=[];
   for(const {record} of ranked) {
     const identity=`${record.doc.key}:${record.article.number}`;
