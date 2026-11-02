@@ -92,7 +92,7 @@ export function externalSearchNotice(result, language) {
     missing_key: ['Tavily ntirashyirwamo urufunguzo.', 'La clé Tavily n’est pas configurée.', 'The Tavily search key is not configured.'],
     quota: ['Ingano y’ishakisha ry’ubuntu yarangiye.', 'Le quota de recherche gratuit est épuisé.', 'The free search allowance is exhausted.'],
     plan: ['Igenzura rya konti y’ubuntu ntiryemeje ishakisha.', 'Le contrôle du compte gratuit n’a pas autorisé la recherche.', 'The free-account check did not permit search.'],
-    usage: ['Ingano y’ishakisha isigaye ntiyashoboye kugenzurwa.', 'Le quota de recherche restant n’a pas pu être vérifié.', 'The remaining search allowance could not be verified.'],
+    usage: ['Igenzura ryo kuri interineti ntirishoboka ubu.', 'La vérification en ligne est temporairement indisponible.', 'Online verification is temporarily unavailable.'],
     empty: ['Nta soko rijyanye n’ikibazo ryabonetse.', 'Aucune source pertinente n’a été trouvée.', 'No suitable source was found.'],
     unavailable: ['Ishakisha ntiryashoboye kurangira.', 'La recherche n’a pas pu aboutir.', 'The search could not be completed.'],
   };

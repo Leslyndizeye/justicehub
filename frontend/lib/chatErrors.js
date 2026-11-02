@@ -1,13 +1,16 @@
 import { interpretCasualMessage } from '../../shared/chatCasual.js';
+import { everydayQuestionRoute, orientationRoute } from '../../shared/everydayQuestions.js';
+
+const modelFreeMessage = message => interpretCasualMessage(message)?.standalone === true || orientationRoute(everydayQuestionRoute(message));
 
 /** Greetings/acknowledgements use the backend's shared rules and no model tokens. */
 export function chatRequestAllowed(message, cooldown, time = Date.now()) {
-  return !(cooldown?.until > time) || interpretCasualMessage(message)?.standalone === true;
+  return !(cooldown?.until > time) || modelFreeMessage(message);
 }
 
 /** A successful canned reply does not establish that the provider quota recovered. */
 export function cooldownAfterReply(message, cooldown) {
-  return interpretCasualMessage(message)?.standalone ? cooldown : null;
+  return modelFreeMessage(message) ? cooldown : null;
 }
 
 /** Keep provider retry metadata when a streamed or JSON response fails. */
@@ -15,6 +18,7 @@ export function chatReplyError(payload, fallback = 'The reply could not be compl
   const seconds = Number(payload?.retryAfterSeconds);
   return Object.assign(new Error(typeof payload?.error === 'string' ? payload.error : fallback), {
     status: Number(payload?.status) || undefined,
+    code: payload?.code === 'account_access_unavailable' ? payload.code : undefined,
     retryAfterSeconds: Number.isFinite(seconds) && seconds > 0 ? seconds : undefined,
   });
 }
@@ -27,6 +31,11 @@ export function rateLimitDeadline(error, time = Date.now()) {
 /** Display actionable text rather than raw network or provider exceptions. */
 export function chatFailureNotice(error, language = 'en') {
   if (error?.status === 429 && error?.retryAfterSeconds > 0) return rateLimitNotice(error.retryAfterSeconds, language);
+  if (error?.status === 503 && error.code === 'account_access_unavailable') return ({
+    en: 'Your account could not be checked right now. Please try again in a moment.',
+    rw: 'Konti yawe ntiyashoboye kugenzurwa ubu. Ongera ugerageze mu kanya.',
+    fr: 'Votre compte n’a pas pu être vérifié pour le moment. Réessayez dans un instant.',
+  })[language] || 'Your account could not be checked right now. Please try again in a moment.';
   if(error?.status===413)return ({en:'This request is too large to answer at once. Try a shorter question or a new conversation.',rw:'Iki kibazo ni kirekire cyane ngo gisubizwe icyarimwe. Gerageza ikibazo kigufi cyangwa utangire ikiganiro gishya.',fr:'Cette demande est trop longue pour une seule réponse. Essayez une question plus courte ou une nouvelle conversation.'})[language] || 'Try a shorter question or a new conversation.';
   const signIn = error?.status === 401;
   if (language === 'rw') return signIn ? 'Ongera winjire kuri konti yawe, hanyuma wongere ugerageze.' : 'Igisubizo nticyarangiye. Ongera ugerageze mu kanya.';

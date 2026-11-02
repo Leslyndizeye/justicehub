@@ -1,5 +1,7 @@
 // Published-PDF retrieval targets, not a benchmark of current legal accuracy.
 export const legalRetrievalCases=[
+  ['Everyday privacy example','Give me one law people commonly break','constitution-2023',23,'en'],
+  ['Sick-leave rights','My employer refuses sick leave. What are my rights?','law-66-2018',54,'en'],
   ['Constitution equality','What does the constitution say about equality?','constitution-2023',15,'en'],
   ['Income tax article','Explain Law No. 027/2022 article 12','law-27-2022',12,'en'],
   ['Screenshot income-tax exemptions','what are Payments exempted from employment income tax','law-27-2022',16,'en'],

@@ -3,6 +3,7 @@ import { matchedLegalVocabulary } from './legalVocabulary.js';
 import { vatQuestion } from './legalTaxTopic.js';
 import { isCorrectionRequest } from './chatCorrection.js';
 import { employmentAgeQuestion } from './employmentAgeTopic.js';
+import { everydayQuestionRoute } from '../shared/everydayQuestions.js';
 
 const fold = text => String(text || '').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
 const legalWords = /\b(?:laws?|legal|legally|illegal|rights?|responsibilit\w*|courts?|judges?|lawyers?|advocates?|attorneys?|justice|constitution|contracts?|agreements?|tax\w*|paye|vat|tva|income|employment|employers?|employees?|labou?r|salary|wages?|dismiss\w*|fired|severance|overtime|maternity|maternitty|termination|apprentice|tenan\w*|landlord|rent\w*|evict\w*|deposit|land|property|ownership|inherit\w*|divorc\w*|marriage|custody|child support|fraud|scam\w*|theft|steal\w*|stolen|robbery|rape|assault|threat\w*|harass\w*|abuse|consent|discriminat\w*|arrest\w*|bail|prison|sentenc\w*|penalt\w*|punish\w*|prohibit\w*|evidence|summon\w*|appeal\w*|lawsuit|complaint|licen[cs]\w*|permit|authoris\w*|authoriz\w*|privacy|data protection|cybercrime|hacking|phishing|copyright|trademark|refund|consumer|compensation|damages|defence|defense|crime|criminal|offence|offense|police|rib|parliament|bar association|bar internal|amategeko|itegeko|tegeko|ingingo|uburenganzira|inshingano|icyaha|ibyaha|ibihano|igihano|umusoro|imisoro|akazi|umukozi|umukoresha|umushahara|kwirukan\w*|ubutaka|amasezerano|ubukode|ubujura|gutubur\w*|gufata\s*ku\s*ngufu|uburiganya|ubwicanyi|ahanish\w*|urukiko|inkiko|ikirego|avoka|kubyara|lois?|juridique|droits?|avocats?|tribunal|impots?|emploi|travail|salaire|licenci\w*|locataire|bailleur|contrat|divorce|plainte|peine|vol|viol|escroquer\w*|autorisation)\b/i;
@@ -23,6 +24,8 @@ export function questionRoute(message, history = []) {
   const text = fold(message);
   if (interpretCasualMessage(message)?.standalone || social.test(text) || introduction.test(text)) return { kind: 'social' };
   if (/\b(?:suicid\w*|kill myself|hurt myself|can't breathe|cannot breathe|medical emergency|in immediate danger)\b/i.test(text)) return { kind: 'safety' };
+  const everyday = everydayQuestionRoute(message, history);
+  if (everyday && !requestsOnlineSearch(message)) return everyday;
   if (fictionalIntroduction.test(text)) return { kind: 'social' };
   // A fictional lawyer is permitted conversation, not automatically a request
   // for statutes. Let semantic understanding distinguish plot from real law.
@@ -47,6 +50,16 @@ export function questionRoute(message, history = []) {
     if (onlineFollowup.test(text) && earlierRoute?.kind === 'unrelated') return { kind: 'unrelated' };
   }
   return { kind: 'unclear' };
+}
+
+// A generic legal keyword establishes scope, not the meaning of an informal
+// question. Give the semantic classifier these requests before choosing laws.
+export function needsQuestionUnderstanding(message, route) {
+  if (route.clarification || route.intent) return false;
+  if (route.kind === 'unclear') return true;
+  return route.kind === 'legal' && !route.researchTopic && !route.context
+    && /\b(?:laws?|legal|illegal|allowed|rights?)\b/i.test(message)
+    && !/\b(?:article|ingingo|constitution|tax|vat|paye|employment|labou?r|salary|dismissal|marriage|divorce|contract|rent|landlord|tenant|land|property|theft|fraud|rape|assault|bail|arrest|court|privacy|cybercrime|lawyer|licen[cs]e|permit)\b/i.test(message);
 }
 
 export function scopeReply(language = 'en') {

@@ -6,8 +6,57 @@ import Groq from 'groq-sdk';
 import { createChatProvider, publicChatError } from '../chatProvider.js';
 import { configuredSearchFallback } from '../searchFallback.js';
 import { resolveReplyLanguage } from '../chatLanguage.js';
+import { searchLegalDocs } from '../legalRetrieval.js';
+import { chatErrorDiagnostic } from '../chatDiagnostics.js';
 
 const cases = [
+  {
+    id: 'everyday_feelings',
+    message: 'i am in love with someone is it legal in rwanda',
+    check(reply) {
+      assert.match(reply, /romantic feelings/i);
+      assert.match(reply, /age.*consent/i);
+      assert.doesNotMatch(reply, /couldn.t establish|search allowance|Article \d/);
+    },
+  },
+  {
+    id: 'everyday_wording',
+    message: 'can u tell me one law that sometimes we likely kill',
+    check(reply) {
+      assert.match(reply, /law people sometimes break/);
+      assert.match(reply, /law about killing/);
+      assert.doesNotMatch(reply, /Article \d|prison|couldn.t establish/);
+    },
+  },
+  {
+    id: 'everyday_wellbeing',
+    message: 'i think i am sick',
+    check(reply) {
+      assert.match(reply, /sorry.*unwell/is);
+      assert.match(reply, /healthcare professional.*sick leave/is);
+      assert.doesNotMatch(reply, /JusticeHub focuses|outside.*scope|you (?:have|suffer from) /i);
+    },
+  },
+  {
+    id: 'everyday_example',
+    message: 'the first one',
+    history: [{ sender: 'user', content: 'can u tell me one law that sometimes we likely kill' },
+      { sender: 'ai', content: 'Do you mean an example of a law people sometimes break, or a law about killing someone?' }],
+    check(reply) {
+      assert.match(reply, /privacy|private/i);
+      assert.match(reply, /Article 23/);
+      assert.match(reply, /https:\/\//);
+      assert.doesNotMatch(reply, /couldn.t establish|murder|homicide|most people|frequently broken/i);
+    },
+  },
+  {
+    id: 'everyday_understanding',
+    message: 'Can you explain the law about a crush?',
+    check(reply) {
+      assert.match(reply, /feelings|relationship|marriage|age|consent/i);
+      assert.doesNotMatch(reply, /couldn.t establish|search allowance|Article 13|murder|theft/i);
+    },
+  },
   {
     id: 'off_topic',
     message: 'Give me a chocolate cake recipe with ingredients and baking steps.',
@@ -117,7 +166,7 @@ const cases = [
 ];
 
 const selectedId = process.argv[2];
-const selected = selectedId ? cases.filter(item => item.id === selectedId) : cases;
+const selected = selectedId ? cases.filter(item => selectedId === 'everyday' ? item.id.startsWith('everyday_') : item.id === selectedId) : cases;
 if (!selected.length) throw new Error(`Choose a case: ${cases.map(item => item.id).join(', ')}`);
 const client = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
 const provider = createChatProvider({
@@ -132,7 +181,12 @@ const provider = createChatProvider({
 for (const item of selected) {
   try {
     let vocabularyRecovery = false;
-    const reply = await provider.reply({ message: item.message, role: 'citizen', history: item.history, streaming: true, signal: AbortSignal.timeout(90000),
+    const signal = AbortSignal.timeout(90000);
+    const replyLanguage = resolveReplyLanguage(item.message, item.history || []);
+    const routing = await provider.understand({ message: item.message, history: item.history, signal });
+    const legalDocs = await searchLegalDocs({ from() { throw new Error('Live behavior evaluation does not access the database'); } },
+      item.message, item.history, replyLanguage, { resolvedRoute: routing });
+    const reply = await provider.reply({ message: item.message, role: 'citizen', history: item.history, routing, legalDocs, replyLanguage, streaming: true, signal,
       onEvent: (event, data) => { if (event === 'status' && /inyito|term’s meaning/.test(data.text || '')) vocabularyRecovery = true; },
     });
     console.log(`\n${item.id}\n${reply}`);
@@ -142,8 +196,7 @@ for (const item of selected) {
   } catch (error) {
     const message = error.code === 'ERR_ASSERTION' ? 'Behavior check failed; review the reply above.' : publicChatError(error).error;
     console.error(`${item.id}: ${message}`);
-    const detail = error.error?.error || error.error || {};
-    console.error('Diagnostic:', error.status || error.name, detail.code || error.code || '', error.status === 400 ? String(detail.message || '').slice(0, 300) : (!error.status && error.code !== 'ERR_ASSERTION' ? error.message : ''));
+    console.error('Diagnostic:', chatErrorDiagnostic(error));
     process.exitCode = 1;
     break; // No repeated API calls when a quota or provider failure blocks evaluation.
   }

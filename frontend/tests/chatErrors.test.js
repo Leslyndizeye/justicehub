@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chatReplyError, rateLimitDeadline, rateLimitNotice, chatRequestAllowed, cooldownAfterReply } from '../lib/chatErrors.js';
+import { chatReplyError, chatFailureNotice, rateLimitDeadline, rateLimitNotice, chatRequestAllowed, cooldownAfterReply } from '../lib/chatErrors.js';
 import { casualReply } from '../../shared/chatCasual.js';
 
 test('only rate-limit errors with a valid duration establish a cooldown', () => {
@@ -32,4 +32,25 @@ test('cooldown permits only shared model-free casual replies, not a substantive 
   }
   assert.equal(cooldownAfterReply('Explain the current fraud law', cooldown), null);
   assert.equal(cooldownAfterReply('bimeze gute c', null), null);
+});
+
+test('the reported everyday orientations stay usable during cooldown without clearing the model limit', () => {
+  const cooldown = { until: 678000, language: 'en' };
+  for (const message of ['i think i am sick', 'i am in love with someone is it legal in rwanda', 'can u tell me one law that sometimes we likely kill']) {
+    assert.equal(chatRequestAllowed(message, cooldown, 1000), true);
+    assert.equal(cooldownAfterReply(message, cooldown), cooldown);
+  }
+  for (const message of ['search online for a law people sometimes kill', 'I am in love with someone who is fifteen. Is it legal?', 'Give me one law people commonly break']) {
+    assert.equal(chatRequestAllowed(message, cooldown, 1000), false, message);
+  }
+});
+
+test('account-access failures keep their safe code and do not masquerade as model quota or expired sign-in', () => {
+  const error = chatReplyError({ status: 503, code: 'account_access_unavailable', error: 'Account access could not be verified. Try again.' });
+  assert.equal(error.code, 'account_access_unavailable');
+  assert.equal(rateLimitDeadline(error), 0);
+  assert.match(chatFailureNotice(error), /account could not be checked/);
+  assert.match(chatFailureNotice(error, 'rw'), /Konti/);
+  assert.match(chatFailureNotice(error, 'fr'), /compte/);
+  assert.equal(chatReplyError({ code: 'private_database_detail' }).code, undefined);
 });

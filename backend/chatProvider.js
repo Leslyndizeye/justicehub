@@ -17,10 +17,12 @@ import {unsupportedArticleCitations,unsupportedFilingPeriod,sourceReadingReply} 
 import {referencesForQuestion} from './legalReferences.js';
 import {evidenceResponseFormat,validateEvidenceAnswer,renderEvidenceAnswer} from './evidenceAnswer.js';
 import {prepareEvidenceRequest} from './evidenceRequest.js';
-import { questionRoute, scopeReply, insufficientSourcesReply } from './questionRouting.js';
+import { questionRoute, needsQuestionUnderstanding, scopeReply, insufficientSourcesReply } from './questionRouting.js';
+import { everydayQuestionReply } from '../shared/everydayQuestions.js';
 import { inferQuestionRoute } from './questionUnderstanding.js';
 import { employmentAgeAnswer } from './employmentAgeAnswer.js';
 import {reusableLawExplanation,createLawExplanationCache} from './lawExplanationCache.js';
+import {applicationClarification} from './legalApplicationGuard.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -117,7 +119,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
     async understand({ message, history = [], signal }) {
       signal?.throwIfAborted();
       const local = questionRoute(message, history);
-      if (local.kind !== 'unclear') return local;
+      if (!needsQuestionUnderstanding(message, local)) return local;
       for (const candidate of models) {
         if ((cooldowns.get(candidate)?.until || 0) > now()) continue;
         const timeout = AbortSignal.timeout(Math.min(requestTimeoutMs, 10000));
@@ -146,6 +148,11 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         return greeting;
       }
       const route = routing || questionRoute(message, history);
+      const orientation = everydayQuestionReply(route, language);
+      if (orientation) {
+        if (streaming) onEvent('token', { text: orientation });
+        return orientation;
+      }
       if (route.kind === 'unrelated') {
         const reply = scopeReply(language);
         if (streaming) onEvent('token', { text: reply });
@@ -241,7 +248,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
               const completion=await client.chat.completions.create({...request,stream:false},{signal:requestSignal});
               signal?.throwIfAborted();
               const result=validateEvidenceAnswer(completion.choices?.[0]?.message?.content || '',bundle,message,language);
-              if (!result.ok && result.reason !== 'insufficient' && !evidenceRepairUsed && attempt < 3) {
+              if (!result.ok && !['insufficient','needs_context'].includes(result.reason) && !evidenceRepairUsed && attempt < 3) {
                 // Reuse the same evidence once to obtain a checked explanation;
                 // never publish the failed draft or research merely to mask it.
                 evidenceRepairUsed = true;
@@ -261,7 +268,9 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
                 if (externalSearchResult.sources?.length) continue;
               }
               let reply=result.ok ? renderEvidenceAnswer(result,language)
+                : ['needs_context','scope_connection'].includes(result.reason) ? applicationClarification(message,language)
                 : result.reason === 'insufficient' ? insufficientSourcesReply(language)
+                : result.reason === 'offence_support' ? insufficientSourcesReply(language)
                   : sourceReadingReply(context.legalDocs,language,message);
               const conflicts=vocabularyIssues(message,history,reply);
               if(conflicts.length)reply=correctedVocabularyReply({message,history,language,issues:conflicts});

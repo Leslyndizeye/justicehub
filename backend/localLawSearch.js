@@ -6,6 +6,8 @@ import {employmentAgeQuestion} from './employmentAgeTopic.js';
 
 const noise=new Set('a an the to of and or in on for is are was were it this that those what how why when which please explain tell me about under law laws article articles no ya mu ni ku kuri iki ki avuga rivuga amategeko itegeko mbwira rwanda rwandan en le la les de des du loi au does do can could should would my your i we have with person people umuntu'.split(' '));
 const hints=[
+  [/\b(?:constitution rights privacy|private (?:life|messages|communications))\b/i,['privacy','private','family','life'],'constitution-2023',/^Article 23\b|^Ingingo ya 23\b/i],
+  [/\b(?:sick|medical|illness)\s+leave\b|ikiruhuko.*uburwayi|cong[eé].*maladie/i,['sick','leave'],'law-66-2018',/sick leave|uburwayi|maladie/i],
   [{test:employmentAgeQuestion},['minimum','age','admission','employment','child'],'law-66-2018'],
   [/\b(?:minimum age|child(?:ren)?|kids?|umwana|abana|enfants?).*(?:work|employ|akazi|gukora|travail)|\b(?:work|employ|akazi|travail).*(?:minimum age|child(?:ren)?|kids?|umwana|abana|enfants?)/i,['minimum','age','admission','employment','child'],'law-66-2018',/minimum age|work for the child|imyaka|umwana|âge|enfant/i],
   [/\b(?:unpaid|not (?:been )?paid|ntampemba|ntahemb|adahemba)\b/i,['salary','intervals','prescription'],'law-66-2018',/salary|umushahara|salaire/i],

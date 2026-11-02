@@ -65,13 +65,19 @@ test('public API access verifies sign-in, owner IDs, database roles, and session
 
 test('a failed role or ownership lookup denies access instead of trusting caller input', async t => {
   const app = express();
-  app.use('/api', apiAccess({ verify: async () => ({ uid: 'alice' }), profile: async () => { throw new Error('Database unavailable'); }, ownsSession: async () => { throw new Error('Database unavailable'); } }));
+  const diagnostics = [];
+  app.use('/api', apiAccess({ verify: async () => ({ uid: 'alice' }), profile: async () => { throw new TypeError('fetch failed', { cause: Object.assign(new Error('private hostname'), { code: 'ENOTFOUND' }) }); }, ownsSession: async () => { throw { code: '42501', message: 'private account details' }; }, onError: diagnostic => diagnostics.push(diagnostic) }));
   app.use('/api', (req, res) => res.json({ unsafe: true }));
   const server = await new Promise(resolve => { const server = app.listen(0, '127.0.0.1', () => resolve(server)); });
   t.after(() => { server.closeAllConnections(); server.close(); });
-  for (const path of ['/api/admin/stats', '/api/messages/session']) {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { headers: { Authorization: 'Bearer token' } });
+  for (const [path, method] of [['/api/chat', 'POST'], ['/api/admin/stats', 'GET'], ['/api/messages/session', 'GET']]) {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { method, headers: { Authorization: 'Bearer token' } });
     assert.equal(response.status, 503);
-    assert.doesNotMatch(await response.text(), /unsafe/);
+    assert.deepEqual(await response.json(), { error: 'Account access could not be verified. Try again.', code: 'account_access_unavailable' });
   }
+  assert.deepEqual(diagnostics, [
+    { stage: 'profile', reason: 'database_dns_failed', causeCode: 'ENOTFOUND' },
+    { stage: 'profile', reason: 'database_dns_failed', causeCode: 'ENOTFOUND' },
+    { stage: 'session_ownership', reason: 'database_permission_denied', code: '42501' },
+  ]);
 });

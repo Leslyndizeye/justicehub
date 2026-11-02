@@ -15,6 +15,7 @@ import { apiAccess } from './apiAccess.js';
 import { configuredCorsOrigins } from './corsConfig.js';
 import { configuredSpeechProvider } from './speechProvider.js';
 import { speechRouter } from './speechRoutes.js';
+import { createAccountAccessStore } from './accountAccessStore.js';
 
 const app = express();
 const allowedOrigins = configuredCorsOrigins(process.env.FRONTEND_URL);
@@ -25,18 +26,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok', revision: /^[a-f0-9]{4
   ? process.env.RENDER_GIT_COMMIT.slice(0, 12) : 'local' }));
 const verifyIdentity = createFirebaseIdentity({ projectId: process.env.FIREBASE_PROJECT_ID?.trim() || 'ireme-30164' });
 app.use('/api/memory', memoryRouter({ verify: verifyIdentity, store: configuredMemoryStore() }));
-app.use('/api', apiAccess({ verify: verifyIdentity,
-  profile: async uid => {
-    const { data, error } = await supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
-    if (error) throw error;
-    return data;
-  },
-  ownsSession: async (id, uid) => {
-    const { data, error } = await supabase.from('chat_sessions').select('id').eq('id', id).eq('user_id', uid).maybeSingle();
-    if (error) throw error;
-    return Boolean(data);
-  },
-}));
+app.use('/api', apiAccess({ verify: verifyIdentity, ...createAccountAccessStore(supabase) }));
 
 const speechProvider = configuredSpeechProvider();
 app.use('/api/speech', speechRouter({ provider: speechProvider }));

@@ -3,6 +3,7 @@ import {referencesForQuestion} from './legalReferences.js';
 import {interpretLegalQuestion} from './legalQuestion.js';
 import {unsupportedArticleCitations,unsupportedFilingPeriod} from './lawGrounding.js';
 import {needsTranslation} from './chatTranslation.js';
+import {legalApplicationIssue} from './legalApplicationGuard.js';
 
 const normalize=text=>String(text).normalize('NFKC').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[\u2010\u2011]/g,'-').replace(/([\p{L}])-\s+(?=[\p{L}])/gu,'$1-').replace(/\s+/g,' ').trim().toLowerCase();
 const cleanLabel=text=>String(text||'').replace(/[\[\]\\\r\n]/g,' ').slice(0,180);
@@ -32,7 +33,7 @@ export function evidenceResponseFormat(bundle) {
   }};
   return {type:'json_schema',json_schema:{name:'justicehub_source_answer',strict:true,schema:{
     type:'object',additionalProperties:false,required:['status','points'],properties:{
-      status:{type:'string',enum:['answered','insufficient']},points:{type:'array',items:point},
+      status:{type:'string',enum:['answered','insufficient','needs_context']},points:{type:'array',items:point},
     },
   }}};
 }
@@ -45,6 +46,7 @@ For numbered paragraphs or items provide the actual number containing the quote,
 Read the quote's conditions, exceptions, thresholds, periods and negation BEFORE interpreting it. Rule numbers must occur in the supporting quotes. Application points may also use facts explicitly provided by the user; label the conclusion as conditional, not a judicial decision. Do not add uncited filing/application steps, assume a tax exemption is 0%, convert quarters into weeks, or invent calculations. Distinguish dated PDFs from verified current law.
 Keep each person's qualification distinct. For example, an exemption requiring both a non-resident employee and a non-resident employer must mention both; the employer's residence alone does not qualify every employee. Preserve listed subconditions without inventing an "or" or an "and" when the text leaves their relationship unclear.
 State rules established by the source directly: "Article 5 sets...", not "I think", "perhaps" or "I cannot verify" when that wording is supplied. Limit uncertainty to a specific missing fact, incomplete source or unverified later change; never claim a current-law check or a case outcome that the evidence does not establish.
+Before an application, establish the provision's scope and the legally relevant facts connecting the user to it. A general civil good-faith principle does not decide whether a private lie is unlawful, breaches an obligation or is a crime. Do not infer criminal liability or absence of liability from a civil principle. Name fraud, defamation, perjury or another offence only with its own specific supporting provision and relevant elements; a lie alone does not establish those elements. Keep civil duties and criminal offences distinct. If material facts are missing, return status "needs_context" with an empty points array. Do not add speculation to fill the gap. Avoid repeating the same paragraph or quotation for an application; explain the connection rather than restating a rule.
 If the sources do not support the requested answer, return status "insufficient" with an empty points array. Do not hide unsupported advice in any other field. An incomplete article or a search snippet cannot establish an exhaustive list or a precise new legal requirement.`;
 
 export function evidenceRepairInstruction(reason) {
@@ -58,6 +60,8 @@ export function evidenceRepairInstruction(reason) {
     filing_period:'The explanation changed the filing period in the source.',
     residence_condition:'The explanation omitted the employee non-residence condition.',
     exemption_conflict:'The explanation confused an exemption with a zero rate.',
+    scope_connection:'A general civil principle was stretched into a conclusion about conduct, breach or criminal liability. Establish the legal scope and factual connection; use needs_context for missing facts or insufficient for missing authority.',
+    offence_support:'An offence was named without its own supporting provision and relevant elements. Remove the unsupported charge or provide its actual quoted authority; a general civil principle is not criminal authority.',
     language:'The explanation was not in the requested language.',
     length:'The explanation exceeded the word limit.',
   }[reason] || 'The previous draft failed a source or format check.';
@@ -81,8 +85,8 @@ export function validateEvidenceAnswer(raw,bundle,message,language) {
   try {
     if(typeof raw!=='string'||raw.length>22000)return {ok:false,reason:'format'};
     const answer=JSON.parse(raw);
-    if(!answer || Object.keys(answer).some(key=>!['status','points'].includes(key)) || !['answered','insufficient'].includes(answer.status) || !Array.isArray(answer.points))return {ok:false,reason:'format'};
-    if(answer.status==='insufficient')return {ok:false,reason:answer.points.length===0?'insufficient':'format'};
+    if(!answer || Object.keys(answer).some(key=>!['status','points'].includes(key)) || !['answered','insufficient','needs_context'].includes(answer.status) || !Array.isArray(answer.points))return {ok:false,reason:'format'};
+    if(answer.status!=='answered')return {ok:false,reason:answer.points.length===0?answer.status:'format'};
     if(answer.points.length<1||answer.points.length>6)return {ok:false,reason:'format'};
     const known=new Map(bundle.sources.map(source=>[source.id,source]));
     const checked=[];
@@ -106,6 +110,8 @@ export function validateEvidenceAnswer(raw,bundle,message,language) {
         evidence.push({entry,source});
       }
       const quoted=evidence.map(item=>item.entry.quote).join('\n');
+      const applicationIssue=legalApplicationIssue(point,evidence);
+      if(applicationIssue)return {ok:false,reason:applicationIssue};
       if(point.statement.trim().length>=60 && evidence.some(item=>normalize(item.entry.quote).includes(normalize(point.statement))))return {ok:false,reason:'explanation'};
       if(language==='en' && point.kind==='rule' && /by a non[\s\u2010\u2011-]+resident individual/i.test(normalize(quoted))
         && (/non[\s\u2010\u2011-]+resident/i.test(point.statement) || /^(?:5[°ºo]|employment income received from an employer)/i.test(normalize(quoted)))
@@ -132,18 +138,31 @@ export function validateEvidenceAnswer(raw,bundle,message,language) {
 
 export function renderEvidenceAnswer(result,language) {
   const used=new Map();
+  const groups=new Map();
   const articleWord={en:'Article',rw:'Ingingo ya',fr:'Article'}[language]||'Article';
-  const points=result.points.map(point=>{
+  for(const point of result.points) {
     const attribution=point.evidence.map(({source,entry})=>{
       used.set(source.id,source);
       return source.doc.articleNumber ? `${articleWord} ${source.doc.articleNumber}${entry.paragraph===null?'':`(${entry.paragraph})`}` : source.doc.title;
     });
-    const quoted=point.evidence[0].entry.quote.trim().split('\n').map(line=>`> ${line}`).join('\n');
+    // Same source and paragraph share a heading/quote, while different laws
+    // with the same article number remain separate. Preserve distinct reasoning.
+    const key=JSON.stringify(point.evidence.map(({source,entry})=>[source.doc.source,source.doc.articleNumber,entry.paragraph]).sort());
+    if(!groups.has(key))groups.set(key,{attribution,points:[],quotes:new Map()});
+    const group=groups.get(key);
+    if(!group.points.some(item=>normalize(item.statement)===normalize(point.statement)))group.points.push(point);
+    for(const {entry} of point.evidence)group.quotes.set(normalize(entry.quote),entry.quote);
+  }
+  const points=[...groups.values()].map(group=>{
+    const quoted=[...group.quotes.values()].map(quote=>quote.trim().split('\n').map(line=>`> ${line}`).join('\n')).join('\n\n');
     const original={en:'Original source text',rw:'Amagambo yo mu nyandiko',fr:'Texte original'}[language]||'Original source text';
-    const explanation=point.kind==='application'
+    const explanations=group.points.map(point=>{
+      const explanation=point.kind==='application'
       ? {en:'How this relates to your question',rw:'Uko bifitanye isano n’ikibazo cyawe',fr:'Lien avec votre question'}[language] || 'How this relates to your question'
       : {en:'In plain language',rw:'Ibisobanuro mu magambo yoroshye',fr:'En termes simples'}[language] || 'In plain language';
-    return `**${[...new Set(attribution)].map(cleanLabel).join('; ')}**\n\n**${explanation}:** ${point.statement}\n\n*${original}:*\n\n${quoted}`;
+      return `**${explanation}:** ${point.statement}`;
+    });
+    return `**${[...new Set(group.attribution)].map(cleanLabel).join('; ')}**\n\n${explanations.join('\n\n')}\n\n*${original}:*\n\n${quoted}`;
   });
   const links=new Map();for(const source of used.values()) {
     const url=source.doc.source;let base;

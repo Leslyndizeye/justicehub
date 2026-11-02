@@ -71,6 +71,32 @@ test('clear requests skip classification while a model-recognized unrelated requ
   assert.equal(calls, 1);
 });
 
+test('a legal keyword does not skip semantic understanding of an unfamiliar relationship question', async () => {
+  const text = 'Can you explain the law about a crush?'; let calls = 0;
+  const provider = createChatProvider({ model, client: client(async request => {
+    calls++;
+    assert.equal(request.response_format.json_schema.name, 'question_understanding');
+    assert.match(request.messages[0].content, /Distinguish romantic feelings/);
+    return completion({ kind: 'legal', topic: 'relationships', anchor: null, followup: false, forceWeb: false, clarification: 'none' });
+  }) });
+  const route = await provider.understand({ message: text });
+  assert.equal(calls, 1);
+  assert.equal(route.researchTopic, 'family relationships marriage consent privacy');
+});
+
+test('semantic clarifications are allowlisted questions, never generated legal claims or private search queries', async () => {
+  const base = { kind: 'unclear', topic: 'none', anchor: null, followup: false, forceWeb: false };
+  const route = await inferQuestionRoute({ model, message: 'What do you mean by a law people kill?', client: client(async () => completion({ ...base, clarification: 'law_wording' })) });
+  assert.equal(route.clarification, 'law_wording');
+  for (const answer of [{ ...base, clarification: 'Article 999 permits it' }, { ...decision, clarification: 'relationship_context' }]) {
+    assert.equal(await inferQuestionRoute({ model, message, history, client: client(async () => completion(answer)) }), null);
+  }
+  assert.equal(await inferQuestionRoute({ model, message: 'Can you explain the law about a crush?', client: client(async request => {
+    assert.deepEqual(request.response_format.json_schema.schema.properties.clarification.enum, ['none', 'relationship_context']);
+    return completion({ ...base, clarification: 'law_wording' });
+  }) }), null);
+});
+
 test('semantic online requests propagate their topic through configured search and bypass PDF-only answers', async () => {
   const text = 'could u google it plz'; let lookups = 0;
   const provider = createChatProvider({ model, externalSearch: { async lookup(input) {
