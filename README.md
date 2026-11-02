@@ -103,9 +103,20 @@ Environment files allow the app to connect to these services. Managing their set
 
 JusticeHub uses Groq, the API provider, with `openai/gpt-oss-120b` for answers and `openai/gpt-oss-20b` as its fallback. Both are listed in [Groq's free-plan limits](https://console.groq.com/docs/rate-limits). Tavily performs primary web research; an optional Groq browser request supplies backup sources. This extra request uses the same Groq account quota. Kinyarwanda quality still needs evaluation with native speakers.
 
-Keep the Groq account on the **Free** plan. Check [Settings → Billing](https://console.groq.com/settings/billing); upgrading to Developer enables usage-based charges. The app cannot check or control the account's billing plan. See [Groq's billing guide](https://console.groq.com/docs/billing-faqs).
+The default setup uses a **Free** Groq account. If you choose paid capacity for a tester pilot, upgrading that account to Developer enables usage-based charges and higher rate limits. Set a monthly spending limit and alerts in Groq before the pilot. The app cannot check or control the account's billing plan. See [Groq's billing guide](https://console.groq.com/docs/billing-faqs) and [spending controls](https://console.groq.com/docs/spend-limits).
 
-Free access has request and token limits. When the available models are limited, wait for the retry time shown in chat. The backend does not purchase credits or upgrade the account. Translation repair uses the existing Groq key and counts toward the same account's quotas. No paid translation service is configured. Grok is a separate xAI service whose [API has usage charges](https://docs.x.ai/developers/pricing).
+Free access has request and token limits. Chat's retry time is an estimate, not confirmation that capacity has recovered. Repeated quota failures during both question interpretation and answer generation share increasing retry delays. The backend does not purchase credits or upgrade the account. Translation repair uses the existing Groq key and counts toward the same account's quotas. No separate paid translation service is configured. Grok is a separate xAI service whose [API has usage charges](https://docs.x.ai/developers/pricing).
+
+### Groq and Render are separate accounts
+
+Render hosts the backend; Groq supplies its chat model. Render does not provide or upgrade a Groq account. The connection is the backend environment variable `GROQ_API_KEY`.
+
+1. Sign in to [Groq Console](https://console.groq.com) and create or locate your API key under **API Keys**. If the existing key belongs to an account you cannot access, create a key in your own account.
+2. In Render, open the JusticeHub backend service, then **Environment**. Store that key as `GROQ_API_KEY` and save/redeploy the service. Keep it out of frontend variables.
+3. For higher AI quotas, upgrade the Groq account that owns that key and set its spending controls. No Groq upgrade is performed by the application.
+4. Paying for a Render service instance changes hosting capacity and idle-sleep behavior. It does not change Groq's token or request limits.
+
+An AI quota message does not establish that account-memory storage is healthy. Missing memory tables still require the migration described below in the Supabase project used by Render.
 
 ### Database setup
 

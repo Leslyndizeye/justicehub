@@ -44,9 +44,9 @@ function durationSeconds(value) {
   if (!value) return 0;
   const text = String(value).trim().toLowerCase();
   if (/^\d+(?:\.\d+)?$/.test(text)) return Number(text);
-  if (!/^(?:\d+(?:\.\d+)?\s*[hms]\s*)+$/.test(text)) return 0;
-  return [...text.matchAll(/(\d+(?:\.\d+)?)\s*([hms])/g)]
-    .reduce((seconds, [, count, unit]) => seconds + Number(count) * ({ h: 3600, m: 60, s: 1 }[unit]), 0);
+  if (!/^(?:\d+(?:\.\d+)?\s*(?:ms|[dhms])\s*)+$/.test(text)) return 0;
+  return [...text.matchAll(/(\d+(?:\.\d+)?)\s*(ms|[dhms])/g)]
+    .reduce((seconds, [, count, unit]) => seconds + Number(count) * ({ d:86400, h:3600, m:60, s:1, ms:.001 }[unit]), 0);
 }
 
 export function retryDelaySeconds(error, time = Date.now()) {
@@ -61,7 +61,7 @@ export function retryDelaySeconds(error, time = Date.now()) {
       if (Number.isFinite(date) && date > time) waits.push((date - time) / 1000);
     }
   }
-  const duration = errorDetails(error).message.match(/try again in\s+((?:\d+(?:\.\d+)?\s*[hms]\s*)+)/i)?.[1];
+  const duration = errorDetails(error).message.match(/try again in\s+((?:\d+(?:\.\d+)?\s*(?:ms|[dhms])\s*)+)(?![a-z])/i)?.[1];
   waits.push(durationSeconds(duration));
   // These resets describe different quotas; only use a reset when its quota is exhausted.
   for (const quota of ['requests', 'tokens']) {
@@ -135,6 +135,14 @@ export function boundedContext(history = [], legalDocs = []) {
 
 export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-oss-20b', searchSetting, externalSearch, reasoningEffort = 'medium', requestTimeoutMs = 30000, now = Date.now }) {
   const cooldowns = new Map();
+  function recordRateLimit(candidate,error) {
+    const strikes=(cooldowns.get(candidate)?.strikes||0)+1;
+    const backoff=strikes>1?Math.min(60,5*2**Math.min(strikes-1,4)):0;
+    const seconds=Math.max(retryDelaySeconds(error,now()),backoff);
+    cooldowns.set(candidate,{until:now()+seconds*1000,strikes});
+    error.retryAfterSeconds=seconds;
+    return seconds;
+  }
   const lawExplanations = createLawExplanationCache();
   const models = [...new Set([model, fallbackModel].filter(value => value && value !== 'none'))];
   return {
@@ -152,8 +160,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         } catch (error) {
           signal?.throwIfAborted();
           if (error.status === 429) {
-            const seconds = retryDelaySeconds(error, now());
-            cooldowns.set(candidate, { until: now() + seconds * 1000, strikes: 1 });
+            recordRateLimit(candidate,error);
           } else if (![404, 408, 500, 502, 503, 504].includes(error.status) && !providerFailure(error, timeout.aborted)) return local;
         }
       }
@@ -406,14 +413,10 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
             }
             if (error.name === 'AbortError' && !failure) throw error;
             if (error.status === 429) {
-              const strikes = (cooldowns.get(candidate)?.strikes || 0) + 1;
-              // If a short retry repeatedly fails, slow down rather than hammering the quota.
-              const backoff = strikes > 1 ? Math.min(60, 5 * 2 ** Math.min(strikes - 1, 4)) : 0;
-              const seconds = Math.max(retryDelaySeconds(error, now()), backoff);
+              // Understanding and answering share the same provider budget.
+              const seconds = recordRateLimit(candidate,error);
               earliestRetry = Math.min(earliestRetry, seconds);
-              cooldowns.set(candidate, { until: now() + seconds * 1000, strikes });
               rateLimits.push({ model: candidate, retryAfterSeconds: Math.ceil(seconds) });
-              error.retryAfterSeconds = seconds;
             }
             // Never mix a fallback answer into a reply the user has already seen.
             const canFallback = Boolean(failure) || errorDetails(error).code === 'empty_model_response' || error.status === 429 || (error.status === 404 && errorDetails(error).code === 'model_not_found');

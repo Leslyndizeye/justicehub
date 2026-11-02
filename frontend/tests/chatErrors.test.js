@@ -18,6 +18,15 @@ test('countdown labels use the response language and do not promise quota availa
   assert.match(rateLimitNotice(12, 'fr'), /Attendez au moins 12/);
 });
 
+test('a quota failure keeps the changing countdown in the notice and makes no unverified memory claim',()=>{
+  for(const language of ['en','rw','fr']) {
+    const failure=chatFailureNotice(chatReplyError({status:429,retryAfterSeconds:5}),language);
+    assert.doesNotMatch(failure,/5|memory|mémoire/i,'A saved failure must not show an expired countdown or assert storage health');
+    for(const seconds of [5,0])assert.doesNotMatch(rateLimitNotice(seconds,language),/memory|mémoire/i);
+  }
+  assert.match(chatFailureNotice({status:429}),/usage limit/);
+});
+
 test('cooldown permits only shared model-free casual replies, not a substantive question added to one', () => {
   const cooldown = { until: 678000, language: 'rw' };
   for (const message of ['bimeze gute c', 'bimeze gutec?', 'amakuru c', 'how r u', 'okay okay gotchuuu', 'ok']) {

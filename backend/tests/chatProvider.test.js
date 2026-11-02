@@ -119,6 +119,29 @@ test('uses exhausted quota resets and HTTP-date retries, ignoring non-exhausted 
   assert.equal(retryDelaySeconds({ status: 429 }), 60);
 });
 
+test('milliseconds are not mistaken for minutes and day-long quota waits remain accurate',()=>{
+  assert.equal(retryDelaySeconds(limited('674ms')),.674);
+  assert.equal(retryDelaySeconds(limited('1d2h3m4s')),93784);
+  assert.equal(retryDelaySeconds({status:429,headers:new Headers({
+    'x-ratelimit-remaining-tokens':'0','x-ratelimit-reset-tokens':'674ms',
+  })}),.674);
+  assert.equal(publicChatError(limited('674ms')).retryAfterSeconds,1);
+});
+
+test('repeated understanding limits back off across both phases instead of restarting five-second waits',async()=>{
+  let time=0;let calls=0;
+  const provider=createChatProvider({model:main,now:()=>time,client:client(async()=>{
+    calls++;throw limited('5s');
+  })});
+  const message='he said it was fine, what should i do?';
+  for(const [at,wait,expectedCalls] of [[0,5,2],[5000,10,4],[6000,9,4],[15000,20,6]]) {
+    time=at;
+    const routing=await provider.understand({message});
+    await assert.rejects(provider.reply({message,routing}),error=>error.status===429&&error.retryAfterSeconds===wait);
+    assert.equal(calls,expectedCalls);
+  }
+});
+
 test('repeated short rate limits back off and diagnostics identify the limited models safely', async () => {
   let time = 0;
   let calls = 0;

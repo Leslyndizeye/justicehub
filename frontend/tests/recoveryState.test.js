@@ -56,7 +56,7 @@ test('standalone pages offer real recovery destinations and chat failures preser
   assert.match(page, /aria-label="Recovery links"/);
   assert.doesNotMatch(chatFailureNotice(new TypeError('Failed to fetch')), /Failed to fetch/);
   assert.doesNotMatch(chatFailureNotice({ status: 500, message: 'SQL error with private credentials' }), /SQL|credentials/);
-  assert.match(chatFailureNotice({ status: 429, retryAfterSeconds: 65 }, 'rw'), /1:05/);
+  assert.match(chatFailureNotice({ status: 429, retryAfterSeconds: 65 }, 'rw'), /rugero ntarengwa/);
   assert.match(chatFailureNotice({ status: 401 }, 'fr'), /Reconnectez-vous/);
   assert.match(chatFailureNotice({ status: 413, message: 'Private provider diagnostics' }, 'en'), /shorter question/);
   for(const language of ['en','rw','fr'])assert.doesNotMatch(chatFailureNotice({status:413,message:'Private provider diagnostics'},language),/Private|provider|moment|wait|usage limit/);

@@ -31,7 +31,11 @@ export function rateLimitDeadline(error, time = Date.now()) {
 
 /** Display actionable text rather than raw network or provider exceptions. */
 export function chatFailureNotice(error, language = 'en') {
-  if (error?.status === 429 && error?.retryAfterSeconds > 0) return rateLimitNotice(error.retryAfterSeconds, language);
+  if (error?.status === 429) return ({
+    en:'The reply could not be generated because the chat usage limit was reached. Check the retry notice below.',
+    rw:'Igisubizo nticyatanzwe kuko chat yageze ku rugero ntarengwa. Reba ubutumwa bwo kongera kugerageza hepfo.',
+    fr:'La réponse n’a pas pu être générée car la limite d’utilisation du chat a été atteinte. Consultez le délai de nouvel essai ci-dessous.',
+  })[language] || 'The chat usage limit was reached. Check the retry notice below.';
   const storageNotices = {
     conversation_unavailable: { en: 'Your conversation could not be opened right now. Please try again shortly.', rw: 'Ikiganiro cyawe nticyashoboye gufungurwa ubu. Ongera ugerageze mu kanya.', fr: 'Votre conversation n’a pas pu être ouverte. Réessayez dans un instant.' },
     message_not_saved: { en: 'Your message could not be saved. Please try again shortly.', rw: 'Ubutumwa bwawe ntibwashoboye kubikwa. Ongera ugerageze mu kanya.', fr: 'Votre message n’a pas pu être enregistré. Réessayez dans un instant.' },
@@ -54,12 +58,12 @@ export function rateLimitNotice(seconds, language = 'en') {
   const wait = Math.max(0, Math.ceil(seconds));
   const duration = wait >= 60 ? `${Math.floor(wait / 60)}:${String(wait % 60).padStart(2, '0')}` : String(wait);
   if (language === 'rw') return wait
-    ? `AI yageze ku rugero ntarengwa. Tegereza nibura ${duration}${wait < 60 ? ' s' : ''} mbere yo kongera kugerageza. Memory iracyakora.`
-    : 'Igihe cyo gutegereza kirarangiye. Ushobora kongera kugerageza; serivisi ishobora kuba igifite imipaka. Memory iracyakora.';
+    ? `AI yageze ku rugero ntarengwa. Tegereza nibura ${duration}${wait < 60 ? ' s' : ''} mbere yo kongera kugerageza.`
+    : 'Ushobora kongera kugerageza; serivisi ishobora kuba igifite imipaka.';
   if (language === 'fr') return wait
-    ? `Limite d’utilisation de l’IA atteinte. Attendez au moins ${duration}${wait < 60 ? ' s' : ''} avant de réessayer. La mémoire reste disponible.`
-    : 'Le délai est écoulé. Vous pouvez réessayer ; les limites du service peuvent encore s’appliquer. La mémoire reste disponible.';
+    ? `Limite d’utilisation de l’IA atteinte. Attendez au moins ${duration}${wait < 60 ? ' s' : ''} avant de réessayer.`
+    : 'Vous pouvez réessayer. La disponibilité du chat n’a pas encore été vérifiée.';
   return wait
-    ? `AI usage limit reached. Wait at least ${duration}${wait < 60 ? ' s' : ''} before retrying. Saved memory still works.`
-    : 'The wait time has passed. You can try again; the service may still be limited. Saved memory still works.';
+    ? `AI usage limit reached. Wait at least ${duration}${wait < 60 ? ' s' : ''} before retrying.`
+    : 'You can retry now. Chat availability has not been checked; the service may still be limited.';
 }
