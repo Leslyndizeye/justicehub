@@ -212,7 +212,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         cloudReady.current = false;
         const conflict = error instanceof Error && 'status' in error && error.status === 409;
         setMemoryCloudState(conflict ? 'conflict' : 'local');
-        console.warn('Account memory save failed:', conflict ? 'memory_conflict' : 'memory_unavailable');
+        if (import.meta.env.DEV) console.warn('Account memory save failed:', conflict ? 'memory_conflict' : 'memory_unavailable');
 
         return stored;
       }
@@ -243,7 +243,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
       } catch (error) {
         if (controller.signal.aborted) return;
         setMemoryCloudState('local');
-        console.warn('Account memory load failed:', error instanceof Error && 'code' in error ? error.code : 'memory_unavailable');
+        if (import.meta.env.DEV) console.warn('Account memory load failed:', error instanceof Error && 'code' in error ? error.code : 'memory_unavailable');
       }
     })();
     return () => { controller.abort(); cloudReady.current = false; };
@@ -259,7 +259,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
 
         cloudReady.current = false;
         setMemoryCloudState('conflict');
-        console.warn('Account memory changed in another tab; refresh to synchronize.');
+        if (import.meta.env.DEV) console.warn('Account memory changed in another tab; refresh to synchronize.');
       } catch { /* Another tab may have disabled storage. */ }
     };
     window.addEventListener('storage', update);
@@ -620,6 +620,10 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
               onChange={event => { const value = Number(event.target.value); setRainVolume(value); rainPlayer.setVolume(value / 100); }} />
           </label>}
           {rainError && <p className="chat-rain-notice" role="status">{rainError}</p>}
+          {memoryCloudState === 'local' && <p className="chat-memory-notice" role="status">{memoryPersistent
+            ? 'Memory is saved in this browser. Account sync is unavailable.'
+            : 'Memory is available for this visit only. It could not be saved.'}</p>}
+          {memoryCloudState === 'conflict' && <p className="chat-memory-notice" role="status">Memory changed elsewhere. Refresh before syncing.</p>}
           <div className="chat-account">
             <div className="chat-account-avatar" aria-hidden="true">{displayName.charAt(0).toUpperCase()}</div>
             <div className="chat-account-text"><span>{displayName}</span><small>{userRole === 'citizen' ? 'Citizen account' : userRole}</small></div>

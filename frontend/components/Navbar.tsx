@@ -105,7 +105,8 @@ const Navbar: React.FC<NavbarProps> = ({ onAuthClick }) => {
               <button 
                 key={link.id}
                 onClick={() => scrollTo(link.id)}
-                className={`block w-full text-left text-3xl font-black tracking-tighter transition-all duration-500 delay-[${idx * 100}ms] ${isMobileMenuOpen ? 'translate-x-0 opacity-100' : 'translate-x-10 opacity-0'} text-white hover:text-legal-gold`}
+                style={{ transitionDelay: `${idx * 100}ms` }}
+                className={`block w-full text-left text-3xl font-black tracking-tighter transition-all duration-500 ${isMobileMenuOpen ? 'translate-x-0 opacity-100' : 'translate-x-10 opacity-0'} text-white hover:text-legal-gold`}
               >
                 {link.name}
               </button>

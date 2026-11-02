@@ -250,3 +250,11 @@ test('ordinary representations, names, stories, and rooms remain outside the new
   ]) assert.equal(canonicalLegalQuestion(question), question);
   assert.equal(interpretLegalQuestion('kunyereza umusoro').topic, null);
 });
+test('ordinary human-killing wording routes to homicide without treating software or figurative killing as a charge', () => {
+  for (const message of ['a person killing another person', 'He killed someone', 'She did not kill a person']) {
+    assert.equal(interpretLegalQuestion(message).topic, 'murder', message);
+  }
+  for (const message of ['kill the process', 'this song is killing it', 'a killer app', 'kill the lights']) {
+    assert.notEqual(interpretLegalQuestion(message).topic, 'murder', message);
+  }
+});

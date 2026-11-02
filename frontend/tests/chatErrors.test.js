@@ -36,7 +36,7 @@ test('cooldown permits only shared model-free casual replies, not a substantive 
 
 test('the reported everyday orientations stay usable during cooldown without clearing the model limit', () => {
   const cooldown = { until: 678000, language: 'en' };
-  for (const message of ['i think i am sick', 'i am in love with someone is it legal in rwanda', 'can u tell me one law that sometimes we likely kill']) {
+  for (const message of ['i think i am sick', 'i am in love with someone is it legal in rwanda', 'can u tell me one law that sometimes we likely kill', 'so what do u think about the person killing another person']) {
     assert.equal(chatRequestAllowed(message, cooldown, 1000), true);
     assert.equal(cooldownAfterReply(message, cooldown), cooldown);
   }

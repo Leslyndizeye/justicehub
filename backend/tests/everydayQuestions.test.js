@@ -20,6 +20,8 @@ test('the reported everyday questions receive helpful streamed replies even with
     ["I'm falling in love with someone. Is that illegal?", /romantic feelings/],
     ['Is loving someone against the law in Rwanda?', /romantic feelings/],
     ['I have a crush on someone. Is it allowed?', /romantic feelings/],
+    ['so what do u think about the person killing another person', /grave harm.*without understanding what happened.*real incident/is],
+    ['What do you think about murder?', /deliberately.*grave harm/is],
   ]) {
     const routing = await provider.understand({ message });
     const legalDocs = await searchLegalDocs(noDatabase, message, [], 'en', { resolvedRoute: routing });
@@ -31,6 +33,16 @@ test('the reported everyday questions receive helpful streamed replies even with
     assert.equal(reply, tokens.join(''));
     assert.doesNotMatch(reply, /allowance|couldn.t establish|unrelated article|Article \d|Web search used/);
   }
+});
+
+test('specific homicide questions and threats never use the general discussion shortcut', () => {
+  for (const message of ['My neighbour killed someone. What should I do?', 'What is the penalty for killing a person in Rwanda?',
+    'What do you think about murder under article 107?', 'What do you think about someone killing another person in self-defence?',
+    'What do you think about murder? I want to kill him.', 'What do you think about murder? Search online.']) {
+    assert.notEqual(questionRoute(message).intent, 'violence_discussion', message);
+  }
+  assert.equal(questionRoute('I want to kill myself').kind, 'safety');
+  for (const language of ['en', 'rw', 'fr']) assert.ok(everydayQuestionReply(questionRoute('What do you think about murder?'), language));
 });
 
 test('sick-leave rights retrieve illness provisions instead of the general wellbeing orientation or maternity leave', async () => {

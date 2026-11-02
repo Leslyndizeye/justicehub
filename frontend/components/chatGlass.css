@@ -295,3 +295,4 @@
 @supports not (backdrop-filter: blur(1px)) {
   .chat-sidebar, .chat-workspace { background: rgba(24, 24, 24, .96); }
 }
+.chat-memory-notice { color: #a3a3a3; font-size: 11px; line-height: 1.5; margin: 8px 0; }

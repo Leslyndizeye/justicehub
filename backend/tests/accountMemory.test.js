@@ -129,6 +129,15 @@ test('missing privileged storage configuration cannot fall back to the anonymous
   await assert.rejects(store.read('owner-a'), { status: 503, code: 'memory_unconfigured' });
 });
 
+test('an inaccessible memory schema remains an explicit failure rather than an empty cloud memory', async () => {
+  for (const code of ['42P01', 'PGRST205']) {
+    const store = createMemoryStore({ from() { return { select() { return this; }, eq() { return this; },
+      async maybeSingle() { return { error: { code, message: 'Private database detail' } }; } }; } });
+    await assert.rejects(store.read('owner-a'), error => error.status === 503 && error.code === 'memory_schema_missing'
+      && !error.message.includes('Private database detail'));
+  }
+});
+
 test('automatic background facts persist for the verified owner, including corrected and forgotten details', async () => {
   const { client } = fakeDatabase();
   const store = createMemoryStore(client);

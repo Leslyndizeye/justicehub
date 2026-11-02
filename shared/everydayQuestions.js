@@ -1,7 +1,7 @@
 import { questionWording } from './questionWording.js';
 
 const fold = value => String(value || '').normalize('NFKD').replace(/\p{M}/gu, '').replace(/[‘’]/g, "'").toLowerCase().trim();
-const orientationIntents = new Set(['personal_feelings', 'wellbeing']);
+const orientationIntents = new Set(['personal_feelings', 'wellbeing', 'violence_discussion']);
 const feelingsWords = new Set('i im m am in love loving falling have romantic feelings crush on for with someone somebody a person is it that this legal illegal allowed okay ok wrong against the law to be rwanda rwandan please can you u tell me if'.split(' '));
 const exampleWords = new Set('can could would you u please give tell show me us about one an a simple example everyday common commonly often sometimes usually law laws that which people we they break violate ignore likely in rwanda rwandan'.split(' '));
 
@@ -10,6 +10,12 @@ const exampleWords = new Set('can could would you u please give tell show me us 
 export function everydayQuestionRoute(message, history = []) {
   const text = fold(questionWording(message).normalized);
   if (/\b(?:online|internet|interineti|google|browse)\b/.test(text)) return null;
+  // A general ethical discussion is not a request for a statutory charge or
+  // penalty. Keep this narrow: personal incidents, threats and legal details
+  // must continue through safety handling or source-grounded research.
+  if (/^(?:so\s+)?(?:what do (?:you|u) think|what are your thoughts|what is your opinion)\s+(?:about|on|of)\s+(?:(?:a|the)\s+)?(?:person (?:killing|who kills) (?:another person|someone|somebody)|someone killing (?:another person|someone)|murder|homicide|killing (?:someone|another person))[.!?]*$/.test(text)) {
+    return { kind: 'legal', intent: 'violence_discussion' };
+  }
   const feelings = /\b(?:in love|romantic feelings|falling in love|loving someone|love someone|love somebody|crush on someone)\b/.test(text)
     && (text.match(/[\p{L}\p{N}]+/gu) || []).every(word => feelingsWords.has(word));
   const frenchFeelings = /^(?:je suis amoureux|je suis amoureuse)(?: de quelqu'un)?(?: est ce (?:legal|illegal|permis)(?: au rwanda)?)?[.!?]*$/.test(text.replace(/[-,]/g, ' '));
@@ -35,6 +41,11 @@ export function orientationRoute(route) { return orientationIntents.has(route?.i
 
 export function everydayQuestionReply(route, language = 'en') {
   const replies = {
+    violence_discussion: {
+      en: 'Deliberately taking someone’s life is a grave harm: a life is lost, and families and communities can be deeply affected. But I would not judge a particular person without understanding what happened. A deliberate attack, an accident and an act claimed as self-defence need different legal analysis. Are you asking generally, about the law in Rwanda, or about a real incident?',
+      rw: 'Kwambura umuntu ubuzima ubigambiriye ni igikorwa kibi cyane: umuntu arapfa, kandi umuryango we n’abandi bantu bikabagiraho ingaruka zikomeye. Ariko sinacira umuntu urubanza ntazi uko byagenze. Igitero kigambiriwe, impanuka no kuvuga ko umuntu yirwanagaho bisaba gusuzumwa mu buryo butandukanye. Urabaza muri rusange, ku mategeko yo mu Rwanda, cyangwa ku byabaye koko?',
+      fr: 'Ôter délibérément la vie à quelqu’un cause un tort immense : une vie est perdue, et les familles comme les communautés peuvent être profondément touchées. Je ne jugerais toutefois pas une personne sans comprendre les faits. Une attaque délibérée, un accident et un acte présenté comme de la légitime défense demandent des analyses juridiques différentes. Votre question est-elle générale, concerne-t-elle le droit rwandais ou un incident réel ?',
+    },
     personal_feelings: {
       en: 'Having romantic feelings does not, by itself, describe a criminal act. If you mean dating, marriage or sexual activity, age, consent and the circumstances matter. Which part worries you?',
       rw: 'Kugira amarangamutima yo gukunda umuntu ubwabyo ntibivuga ko wakoze icyaha. Niba ubaza ku kurambagizanya, gushyingirwa cyangwa imibonano mpuzabitsina, imyaka, ukwemera n’uko ibintu bimeze ni ngombwa. Ni iki kiguhangayikishije?',

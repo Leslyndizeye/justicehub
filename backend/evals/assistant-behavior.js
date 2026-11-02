@@ -38,6 +38,15 @@ const cases = [
     },
   },
   {
+    id: 'everyday_violence_discussion',
+    message: 'so what do u think about the person killing another person',
+    check(reply) {
+      assert.match(reply, /grave harm/i);
+      assert.match(reply, /real incident/i);
+      assert.doesNotMatch(reply, /couldn.t establish|search.*completed|Article \d|years in prison/i);
+    },
+  },
+  {
     id: 'everyday_example',
     message: 'the first one',
     history: [{ sender: 'user', content: 'can u tell me one law that sometimes we likely kill' },

@@ -13,7 +13,7 @@ export const researchTopics = Object.freeze({
   tenancy: 'tenancy landlord tenant rent lease', family: 'family marriage divorce inheritance',
   land: 'land property ownership', consumer: 'consumer protection refund goods services',
   contracts: 'contracts agreement obligations', fraud: 'fraud scam', theft: 'theft robbery',
-  sexual_violence: 'rape sexual violence', criminal_procedure: 'criminal procedure arrest bail',
+  sexual_violence: 'rape sexual violence', homicide: 'homicide murder killing a person', criminal_procedure: 'criminal procedure arrest bail',
   civil_procedure: 'civil procedure court', constitutional: 'constitution rights equality',
   privacy: 'data protection privacy', cybercrime: 'cybercrime hacking',
   legal_profession: 'lawyer advocate bar association', other: 'law rights',
