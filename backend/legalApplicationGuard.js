@@ -3,6 +3,7 @@
 import {isReviewedStatute} from './criminalProvisions.js';
 const fold=text=>String(text).normalize('NFKD').replace(/\p{M}/gu,'').replace(/[‘’]/g,"'").replace(/\s+/g,' ').toLowerCase();
 const offences=[
+  {claim:/\b(?:theft|stealing|robbery|vol)\b|icyaha cyo kwiba/i,support:/\b(?:theft|steal\w*|stolen|robbery|vol)\b|kwiba|ubujura/i},
   {claim:/\b(?:fraud|escroquerie)\b|icyaha cy['’ ]?uburiganya/i,support:/\b(?:fraud|escroquer\w*|false pretences?|swindl\w*)\b|kwihesha.*uburiganya/i},
   {claim:/\b(?:defamation|libel|slander|diffamation)\b|icyaha cyo gusebanya/i,support:/\b(?:defam\w*|libel|slander|diffam\w*)\b|gusebanya/i},
   {claim:/\b(?:perjury|parjure)\b|icyaha cyo kubeshya.*indahiro/i,support:/\b(?:perjury|parjure|false testimony|false evidence|false oath)\b|kubeshya.*indahiro|ubuhamya bw['’ ]?ibinyoma/i},

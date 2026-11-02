@@ -2,6 +2,7 @@ import {lawExcerptMetadata,excerptArticles} from './lawArticles.js';
 import {readLawArticles} from './lawArticleReader.js';
 import {asksPenalty} from './legalQuestion.js';
 import {isReviewedStatute} from './criminalProvisions.js';
+import {sourceBody,sourceMatchesTopic} from './sourceRelevance.js';
 
 export function unsupportedArticleCitations(text, excerpts, externalSearchResult) {
   // External research can legitimately introduce a different law/article.
@@ -22,7 +23,7 @@ export function unsupportedArticleCitations(text, excerpts, externalSearchResult
 }
 
 export function sourceReadingReply(excerpts, language, question='') {
-  const words=[...new Set(String(question).toLowerCase().match(/[\p{L}]{4,}/gu)||[])].filter(word=>!['what','does','about','please','explain','rwanda','rwandan','labour','employment','amategeko','itegeko','avuga','mbwira','article','ingingo'].includes(word));
+  const words=[...new Set(String(question).toLowerCase().match(/[\p{L}]{4,}/gu)||[])].filter(word=>!['what','does','about','please','explain','tell','this','that','these','those','someone','person','rwanda','rwandan','labour','employment','amategeko','itegeko','avuga','mbwira','article','ingingo'].includes(word));
   const meaning=/defin|meaning|mean\b|scope|purpose|bisobanur|ibirebwa|intego|signifi/i.test(question);
   const background=/definitions|scope of|purpose of|ibisobanuro|ibirebwa|intego|d[eé]finitions|champ d.application|objet de/i;
   const heading=doc=>{
@@ -30,11 +31,13 @@ export function sourceReadingReply(excerpts, language, question='') {
     return metadata && doc.articleNumber ? readLawArticles(metadata.key,metadata.language).find(article=>article.number===doc.articleNumber)?.segments[0]?.text.split('\n')[0] || '' : '';
   };
   const penalty = asksPenalty(question) && !/\b(?:review|appeal|procedure|bail|mitigat\w*)\b/i.test(question);
-  const candidates=excerpts.map(doc=>({doc,body:isReviewedStatute(doc)?doc.content:String(doc.content).split('\n').slice(2).join('\n').trim()}))
+  const explicitArticle=String(question).match(/\b(?:article|ingingo\s*(?:ya)?)\s+(\d{1,4})\b/i)?.[1];
+  const score=text=>words.reduce((sum,word)=>sum+(text.toLowerCase().includes(word)?1:0),0);
+  const candidates=excerpts.filter(doc=>sourceMatchesTopic(doc,question)).map(doc=>({doc,body:sourceBody(doc)}))
+    .filter(item=>score(item.body)>0||explicitArticle&&Number(explicitArticle)===item.doc.articleNumber)
     .filter(item=>!penalty || /\b(?:liable\s+to|punish(?:ed|able)|penalt(?:y|ies)\s+(?:is|are|of|shall)|ahanish\w*|puni\w*|peine\w*)\b/i.test(item.body.replace(/\s+/g,' ')))
     .filter(item=>!penalty || !/^(?:Article\s+\d+:\s*)?(?:grounds for|request for|application for).*(?:review|appeal)/i.test(item.body.replace(/\s+/g,' ')))
     .filter(item=>item.body.length>=30 && (meaning || !background.test(heading(item.doc) || item.body.split('\n')[0])));
-  const score=text=>words.reduce((sum,word)=>sum+(text.toLowerCase().includes(word)?1:0),0);
   candidates.sort((a,b)=>score(b.body)-score(a.body));
   const selected=candidates[0];
   if(!selected) {

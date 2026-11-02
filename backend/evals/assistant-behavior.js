@@ -11,6 +11,15 @@ import { chatErrorDiagnostic } from '../chatDiagnostics.js';
 
 const cases = [
   {
+    id:'conversation_stealing_introduction',message:'tell me about stealing',
+    check(reply) {
+      assert.match(reply,/steal|taking|take/i);
+      assert.match(reply,/permission|consent|belong|owner/i);
+      assert.doesNotMatch(reply,/Article 34|pornograph|sexual|PDF passage|supported explanation|couldn.t establish/i);
+      assert.ok(reply.trim().split(/\s+/).length<=180);
+    },
+  },
+  {
     id: 'conversation_discussion_fraud',
     message: 'what do u think about fraud',
     check(reply) {

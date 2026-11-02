@@ -30,7 +30,7 @@ test('lawful mitigation and requests for wrongdoing are not rewritten as a gener
 
 test('Kinyarwanda uses English topic retrieval and database errors do not fabricate references', async () => {
   let query;
-  const document = { title: 'Theft', content: 'Legal excerpt', source: 'https://official.example/law' };
+  const document = { title: 'Theft', content: 'Legal excerpt concerning theft', source: 'https://official.example/law' };
   const incidental = { title: 'Employment misconduct', content: 'Also mentions theft' };
   const client = { from() { return { select() { return { textSearch(column, value) {
     query = value;

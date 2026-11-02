@@ -90,7 +90,7 @@ test('mixed allegations remain distinct and do not trigger the narrow theft pena
 });
 
 test('retrieval favors a fraud document over an unrelated passing mention', async () => {
-  const fraud = { title: 'Fraud and Swindling', content: 'Relevant excerpt' };
+  const fraud = { title: 'Fraud and Swindling', content: 'Relevant excerpt concerning fraud and swindling' };
   const unrelated = { title: 'Employment handbook', content: 'Mentions fraud' };
   const client = { from() { return { select() { return { textSearch(column, query) {
     assert.match(query, /fraud OR swindling/);

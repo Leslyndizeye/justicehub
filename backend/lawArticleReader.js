@@ -7,7 +7,7 @@ const documents = new Map(corpus.documents.map(doc=>[doc.key,doc]));
 const catalogByHash = new Map(catalog.documents.map(doc=>[doc.sha256,doc]));
 const cache = new Map();
 
-function sourceDocument(excerpt) {
+export function sourceDocument(excerpt) {
   // Legacy entries retain the archived source after "Source PDF:". Do not
   // infer the document solely from a legacy title or a model-generated link.
   for (const match of String(excerpt.source || '').matchAll(/https:\/\/[^\s)]+/g)) {

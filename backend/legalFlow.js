@@ -1,4 +1,5 @@
 import {isPenaltyFollowup} from './legalQuestion.js';
+import {legalFields} from './legalTopics.js';
 
 export const answerTasks=Object.freeze(['none','discussion','explanation','rule','penalty','deadline','amount','procedure','eligibility','remedy','comparison','application','source','current_verification']);
 const fold=value=>String(value||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[’]/g,"'").trim().replace(/[?!.,]+$/,'').replace(/\s+/g,' ');
@@ -40,6 +41,14 @@ export function conceptualDiscussion(message) {
   const start=/^(?:so )?(?:what (?:do|would) (?:you|u) think (?:about|of)|how do (?:you|u) feel about|what(?:'s| is) your (?:view|opinion) (?:on|about|of)|what are your thoughts (?:on|about)|que penses-tu de|que pensez-vous de|utekereza iki kuri)\s+/.exec(text);
   if(!start || text.length>180)return false;
   return !/\b(?:article|section|penalt\w*|punish\w*|sentenc\w*|deadline|current|latest|today|my|our|i|he|she|they|his|her|their|client|case|if|how|can|should|could|report\w*|avoid|evad\w*|commit\w*|charged|convict\w*|online|internet|web|moi|mon|ma|mes)\b|\d|[;\n?]/.test(text.slice(start[0].length));
+}
+export function basicTopicOverview(message) {
+  const text=fold(message);
+  const topic=text.replace(/^(?:please )?(?:tell me (?:a little |a bit |something )?about|give me (?:an? |a simple )?(?:introduction|overview) (?:to|of))\s+/,'');
+  if(topic===text)return false;
+  // Match the entire remaining subject. Personal facts, qualifiers, dates and
+  // requests for legal consequences must keep their own analysis path.
+  return legalFields.some(field=>field.aliases.some(alias=>fold(alias)===topic));
 }
 export function flowInstruction(task) {
   const instructions={

@@ -18,6 +18,7 @@ import {referencesForQuestion} from './legalReferences.js';
 import {evidenceResponseFormat,validateEvidenceAnswer,renderEvidenceAnswer} from './evidenceAnswer.js';
 import {prepareEvidenceRequest} from './evidenceRequest.js';
 import { questionRoute, needsQuestionUnderstanding, scopeReply, insufficientSourcesReply } from './questionRouting.js';
+import {sourceMatchesTopic} from './sourceRelevance.js';
 import { everydayQuestionReply } from '../shared/everydayQuestions.js';
 import { inferQuestionRoute } from './questionUnderstanding.js';
 import { employmentAgeAnswer } from './employmentAgeAnswer.js';
@@ -169,6 +170,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         return greeting;
       }
       const route = routing || questionRoute(message, history);
+      legalDocs=legalDocs?.filter(doc=>sourceMatchesTopic(doc,[route.context,message].filter(Boolean).join('\n')));
       const orientation = everydayQuestionReply(route, language);
       if (orientation) {
         if (streaming) onEvent('token', { text: orientation });

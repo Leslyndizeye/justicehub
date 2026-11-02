@@ -3,7 +3,7 @@ import { matchedLegalVocabulary } from './legalVocabulary.js';
 import lawCatalog from './data/amategekoCatalog.json' with {type:'json'};
 import { vatQuestion, vatFocusArticles } from './legalTaxTopic.js';
 import { excerptArticles, lawExcerptMetadata } from './lawArticles.js';
-import { expandLawArticles } from './lawArticleReader.js';
+import { expandLawArticles,sourceDocument } from './lawArticleReader.js';
 import {searchLocalLaws} from './localLawSearch.js';
 import { questionRoute } from './questionRouting.js';
 import { orientationRoute } from '../shared/everydayQuestions.js';
@@ -11,6 +11,7 @@ import { questionWording } from '../shared/questionWording.js';
 import { searchCriminalProvisions } from './criminalProvisions.js';
 import {sourceField,fieldLawKeys} from './lawCoverage.js';
 import {legalFieldsIn} from './legalTopics.js';
+import {sourceMatchesTopic} from './sourceRelevance.js';
 
 const noise = new Set('a an the is are was were be been being of in on for to at and or with from by as it this that these those me my you your i we our us please explain tell show understand what which how why when about law laws rwanda rwandan article articles no number latest current english french kinyarwanda under relating governing says does do should could would rwo bya ibyo kuri ni iki gute amategeko mbwira'.split(' '));
 const catalogue = new Map(lawCatalog.documents.map(doc=>[doc.key,doc]));
@@ -46,7 +47,7 @@ export function rankLegalDocuments(documents, message, topic, language = 'en') {
     return value;
   };
   const wantsContents = /table of contents|ishakiro|amashakiro|table des mati/i.test(message);
-  const ranked = documents.filter(doc => { const meta = metadata(doc); return wantsContents || !meta || meta.page >= meta.provisionsFrom; })
+  const ranked = documents.filter(doc => sourceMatchesTopic(doc,message)).filter(doc => { const meta = metadata(doc); return wantsContents || !meta || meta.page >= meta.provisionsFrom; })
     .sort((a,b) => score(b)-score(a));
   const seen = new Set();
   return ranked.filter(doc => {
@@ -66,7 +67,10 @@ export async function searchLegalDocs(client, message, history = [], language = 
   if (route.researchTopic) message += `\nLegal research topic: ${route.researchTopic}`;
   const explicitLaw=/\b(?:law|loi|itegeko|tegeko)\s*(?:(?:no\.?|n[º°o]?\.?|number)\s*)?\d{1,3}\/(?:19|20)\d{2}/i.test(message);
   const allowedKeys=explicitLaw?null:fieldLawKeys(sourceField(route),route.answerTask);
-  const allowedDocument=doc=>!allowedKeys||!lawExcerptMetadata(doc)||allowedKeys.includes(lawExcerptMetadata(doc).key);
+  const allowedDocument=doc=>{
+    const metadata=lawExcerptMetadata(doc)||sourceDocument(doc)?.metadata;
+    return (!allowedKeys||!metadata||allowedKeys.includes(metadata.key))&&sourceMatchesTopic(doc,userQuestion);
+  };
   const localLookup=(query,previous,lang)=>allowedKeys?.length===0?[]:localSearch(query,previous,lang,{answerTask:route.answerTask,allowedLawKeys:allowedKeys}).filter(allowedDocument);
   const { retrievalQuery, topic } = interpretLegalQuestion(message, history);
   try {
