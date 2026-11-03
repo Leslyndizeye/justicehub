@@ -12,6 +12,7 @@ import { searchCriminalProvisions } from './criminalProvisions.js';
 import {sourceField,fieldLawKeys} from './lawCoverage.js';
 import {legalFieldsIn} from './legalTopics.js';
 import {sourceMatchesTopic} from './sourceRelevance.js';
+import {overviewArticles} from './rwandaLawOverview.js';
 
 const noise = new Set('a an the is are was were be been being of in on for to at and or with from by as it this that these those me my you your i we our us please explain tell show understand what which how why when about law laws rwanda rwandan article articles no number latest current english french kinyarwanda under relating governing says does do should could would rwo bya ibyo kuri ni iki gute amategeko mbwira'.split(' '));
 const catalogue = new Map(lawCatalog.documents.map(doc=>[doc.key,doc]));
@@ -74,6 +75,7 @@ export async function searchLegalDocs(client, message, history = [], language = 
   const localLookup=(query,previous,lang)=>allowedKeys?.length===0?[]:localSearch(query,previous,lang,{answerTask:route.answerTask,allowedLawKeys:allowedKeys}).filter(allowedDocument);
   const { retrievalQuery, topic } = interpretLegalQuestion(message, history);
   try {
+    if(route.intent==='rwanda_law_overview')return overviewArticles.flatMap(number=>localLookup(`Constitution article ${number}`,[],language).slice(0,1));
     if(route.answerTask==='comparison') {
       const references=[...message.matchAll(/\b(?:law|loi|itegeko)\s*(?:(?:no\.?|n[º°o]?\.?)\s*)?(\d{1,3})\/((?:19|20)\d{2})/gi)];
       const requests=new Map();

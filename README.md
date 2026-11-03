@@ -118,6 +118,8 @@ Render hosts the backend; Groq supplies its chat model. Render does not provide 
 
 An AI quota message does not establish that account-memory storage is healthy. Missing memory tables still require the migration described below in the Supabase project used by Render.
 
+Broad requests for interesting Rwandan laws can receive a source-backed introduction to privacy, equality and women's representation from the indexed 2023 Constitution without a model or web-search request. The answer requires the complete matching articles, links to the Ministry PDF, and labels the published version. This narrow overview remains usable during a model cooldown but does not clear that cooldown. Current-law checks, historical court claims, specific tax questions and personal cases still need their own supported analysis; they are not replaced by this overview.
+
 ### Database setup
 
 The app uses the existing Supabase database configured in `backend/.env`. Its main tables are `profiles`, `chat_sessions`, `messages`, and `legal_documents`.

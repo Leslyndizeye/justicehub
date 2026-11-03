@@ -1,7 +1,10 @@
 import { interpretCasualMessage } from '../../shared/chatCasual.js';
 import { everydayQuestionRoute, orientationRoute } from '../../shared/everydayQuestions.js';
 
-const modelFreeMessage = message => interpretCasualMessage(message)?.standalone === true || orientationRoute(everydayQuestionRoute(message));
+const modelFreeMessage = message => {
+  const route=everydayQuestionRoute(message);
+  return interpretCasualMessage(message)?.standalone===true||orientationRoute(route)||route?.intent==='rwanda_law_overview';
+};
 const publicCodes = new Set(['account_access_unavailable', 'conversation_unavailable', 'message_not_saved', 'reply_not_saved']);
 
 /** Greetings/acknowledgements use the backend's shared rules and no model tokens. */

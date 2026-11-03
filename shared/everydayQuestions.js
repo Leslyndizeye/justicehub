@@ -1,4 +1,5 @@
 import { questionWording } from './questionWording.js';
+import {rwandaLawOverviewQuestion} from './rwandaLawOverview.js';
 
 const fold = value => String(value || '').normalize('NFKD').replace(/\p{M}/gu, '').replace(/[‘’]/g, "'").toLowerCase().trim();
 const orientationIntents = new Set(['personal_feelings', 'wellbeing', 'violence_discussion']);
@@ -10,6 +11,7 @@ const exampleWords = new Set('can could would you u please give tell show me us 
 export function everydayQuestionRoute(message, history = []) {
   const text = fold(questionWording(message).normalized);
   if (/\b(?:online|internet|interineti|google|browse)\b/.test(text)) return null;
+  if(rwandaLawOverviewQuestion(text))return {kind:'legal',intent:'rwanda_law_overview',researchTopic:'constitution rights equality'};
   // A general ethical discussion is not a request for a statutory charge or
   // penalty. Keep this narrow: personal incidents, threats and legal details
   // must continue through safety handling or source-grounded research.

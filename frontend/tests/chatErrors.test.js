@@ -54,6 +54,15 @@ test('the reported everyday orientations stay usable during cooldown without cle
   }
 });
 
+test('the published-source Rwanda overview stays usable without claiming that the AI quota recovered',()=>{
+  const cooldown={until:678000,language:'en'};
+  const question='so tell me about rwandans laws which are interesting ..?';
+  assert.equal(chatRequestAllowed(question,cooldown,1000),true);
+  assert.equal(cooldownAfterReply(question,cooldown),cooldown);
+  assert.equal(chatRequestAllowed('What are the current Rwanda tax laws?',cooldown,1000),false);
+  assert.equal(chatRequestAllowed('Tell me about Gacaca courts today',cooldown,1000),false);
+});
+
 test('account-access failures keep their safe code and do not masquerade as model quota or expired sign-in', () => {
   const error = chatReplyError({ status: 503, code: 'account_access_unavailable', error: 'Account access could not be verified. Try again.' });
   assert.equal(error.code, 'account_access_unavailable');

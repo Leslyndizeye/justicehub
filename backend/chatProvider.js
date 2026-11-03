@@ -19,6 +19,7 @@ import {evidenceResponseFormat,validateEvidenceAnswer,renderEvidenceAnswer} from
 import {prepareEvidenceRequest} from './evidenceRequest.js';
 import { questionRoute, needsQuestionUnderstanding, scopeReply, insufficientSourcesReply } from './questionRouting.js';
 import {sourceMatchesTopic} from './sourceRelevance.js';
+import {rwandaLawOverviewAnswer} from './rwandaLawOverview.js';
 import { everydayQuestionReply } from '../shared/everydayQuestions.js';
 import { inferQuestionRoute } from './questionUnderstanding.js';
 import { employmentAgeAnswer } from './employmentAgeAnswer.js';
@@ -195,6 +196,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       const currentVerification = /\b(?:latest|current|today|now|in force|still appl\w*|202[5-9]|new laws?|amend\w*|updated?|recent|agezweho|mashya|vuba|aujourd'hui|actuel\w*|modifi\w*|recent\w*)\b/i.test(message);
       let needsResearch = route.kind === 'legal' && (!pdfFirst || currentVerification || route.forceWeb);
       const referencedAnswer = route.kind === 'legal' && !route.forceWeb && (employmentAgeAnswer(message, legalDocs, language)
+        || rwandaLawOverviewAnswer(message,legalDocs,language)
         || incomeTaxExemptionsAnswer(message, legalDocs, language)
         || ([undefined,'rule','explanation','amount'].includes(route.answerTask) && vatOverviewAnswer(message, legalDocs, language))
         || referencedPenaltyAnswer(message, interpretLegalQuestion(message, history), language));
