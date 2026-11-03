@@ -1,4 +1,31 @@
 import { theftPenaltyFacts as facts, theftPenaltyReference, theftPoliceReference } from './legalReferences.js';
+import {theftComparisonQuestion} from '../shared/theftComparison.js';
+
+export function referencedTheftComparisonAnswer(message,language='en') {
+  if(!theftComparisonQuestion(message))return null;
+  const source=theftPenaltyReference.source;
+  if(language==='rw')return `**Oya, ibihano si bimwe.** Mu nyandiko yasohowe y’itegeko nº 68/2018:
+
+- **Ingingo ya 166** iteganya ibihano bisanzwe byo kwiba. Iyo ngingo ivuga n’uburyo umuntu ashobora guhanishwa kimwe gusa mu bihano biteganyijwe.
+- **Ingingo ya 167** iteganya ko igihano cyikuba kabiri iyo hari imwe mu mpamvu nkomezacyaha zivugwamo, nko kwiba nijoro cyangwa kwiba byakozwe n’abantu barenze umwe.
+- **Ingingo ya 168** ifite ibihano byihariye ku kwiba hakoreshejwe kiboko cyangwa ibikangisho; ntibikwiye kuvanga ibyo byaha byose.
+
+[Isoko: Minisiteri y’Ubutabera, impapuro za 155–156](${source}). Ibi bisobanura inyandiko yo mu 2018; sinagenzuye impinduka zakurikiyeho kandi si ukwemeza igihano cy’umuntu runaka.`;
+  if(language==='fr')return `**Non, les peines ne sont pas identiques.** Dans le texte publié de la loi nº 68/2018 :
+
+- **L’article 166** prévoit les peines de base du vol, avec la possibilité de ne prononcer qu’une seule des peines énumérées.
+- **L’article 167** double la peine dans les circonstances aggravantes qu’il énumère, notamment le vol commis la nuit ou par plusieurs personnes.
+- **L’article 168** prévoit des peines distinctes pour le vol avec violence ou menaces : toutes ces situations ne relèvent donc pas d’un simple doublement.
+
+[Source : ministère de la Justice, pages 155–156](${source}). Il s’agit du texte publié en 2018 ; les modifications ultérieures et la peine applicable à un cas particulier n’ont pas été vérifiées.`;
+  return `**No—the penalties are not the same.** In the published text of Law nº 68/2018:
+
+- **Article 166** sets the baseline theft penalties and includes the option of only one of the listed penalties.
+- **Article 167** doubles the penalty for the aggravating circumstances it lists, including theft at night or by more than one person.
+- **Article 168** separately addresses theft involving violence or threats. Those cases should not all be treated as simple doubling.
+
+[Source: Ministry of Justice, pages 155–156](${source}). This explains the published 2018 text; I haven’t verified later amendments or the sentence in a particular case.`;
+}
 
 /** Render a narrow source lookup; case advice and current-law verification still need the model. */
 export function referencedPenaltyAnswer(message, interpretation, language) {

@@ -3,7 +3,7 @@ import { everydayQuestionRoute, orientationRoute } from '../../shared/everydayQu
 
 const modelFreeMessage = message => {
   const route=everydayQuestionRoute(message);
-  return interpretCasualMessage(message)?.standalone===true||orientationRoute(route)||route?.intent==='rwanda_law_overview';
+  return interpretCasualMessage(message)?.standalone===true||orientationRoute(route)||['rwanda_law_overview','theft_comparison'].includes(route?.intent);
 };
 const publicCodes = new Set(['account_access_unavailable', 'conversation_unavailable', 'message_not_saved', 'reply_not_saved']);
 
@@ -50,7 +50,7 @@ export function chatFailureNotice(error, language = 'en') {
     rw: 'Konti yawe ntiyashoboye kugenzurwa ubu. Ongera ugerageze mu kanya.',
     fr: 'Votre compte n’a pas pu être vérifié pour le moment. Réessayez dans un instant.',
   })[language] || 'Your account could not be checked right now. Please try again in a moment.';
-  if(error?.status===413)return ({en:'This request is too large to answer at once. Try a shorter question or a new conversation.',rw:'Iki kibazo ni kirekire cyane ngo gisubizwe icyarimwe. Gerageza ikibazo kigufi cyangwa utangire ikiganiro gishya.',fr:'Cette demande est trop longue pour une seule réponse. Essayez une question plus courte ou une nouvelle conversation.'})[language] || 'Try a shorter question or a new conversation.';
+  if(error?.status===413)return ({en:'We couldn’t prepare this reply. Please try again.',rw:'Ntitwashoboye gutegura iki gisubizo. Ongera ugerageze.',fr:'La réponse n’a pas pu être préparée. Réessayez.'})[language] || 'We couldn’t prepare this reply. Please try again.';
   const signIn = error?.status === 401;
   if (language === 'rw') return signIn ? 'Ongera winjire kuri konti yawe, hanyuma wongere ugerageze.' : 'Igisubizo nticyarangiye. Ongera ugerageze mu kanya.';
   if (language === 'fr') return signIn ? 'Reconnectez-vous à votre compte, puis réessayez.' : 'La réponse n’a pas pu être terminée. Réessayez dans un moment.';

@@ -12,7 +12,7 @@ import {evidenceInstruction} from './evidenceAnswer.js';
 import { questionRoute } from './questionRouting.js';
 import {flowInstruction,questionTask} from './legalFlow.js';
 
-export function buildChatMessages({ message, role, history = [], legalDocs = [], routing, searchEnabled = false, externalSearchResult, now = new Date(), instructionRole = 'system', replyLanguage = 'auto', evidenceMode = false, correction = conversationCorrection(message, history) }) {
+export function buildChatMessages({ message, role, history = [], legalDocs = [], routing, searchEnabled = false, externalSearchResult, now = new Date(), instructionRole = 'system', replyLanguage = 'auto', evidenceMode = false, compact = false, correction = conversationCorrection(message, history) }) {
   const semanticHistory = correction ? [...history, { sender: 'user', content: correction.originalQuestion }] : history;
   const interpretation = interpretLegalQuestion(message, semanticHistory);
   const route = routing || questionRoute(message, history);
@@ -125,7 +125,8 @@ JusticeHub focuses on law, rights and lawful options. For unrelated substantive 
 Answer the actual question first. If asking for a list, retain its categories and qualifications rather than inventing examples. Use actual statutory article and paragraph identifiers, never PDF page numbers as article numbers. Source quotations are evidence of a dated published text, not proof of current applicability. ${webInstructions}
 ${routingInstruction}
 ${taskInstruction}
-Today is ${now.toISOString().slice(0,10)}. ${evidenceInstruction}`;
+Keep internal planning, model names, training claims and service diagnostics out of the legal answer. Cite relevant supplied sources using descriptive Markdown links. Never invent a citation, a current-law check, or an unsupported requirement. If evidence is missing, explain the specific limitation and a useful lawful next step.
+Today is ${now.toISOString().slice(0,10)}. ${evidenceMode?evidenceInstruction:''}`;
 
   const matchedReferences = route.kind === 'legal' ? referencesForQuestion(interpretation) : [];
   const referenceDocs = route.kind === 'discussion' ? [] : [...matchedReferences, ...legalDocs, ...officialContacts];
@@ -144,7 +145,7 @@ Today is ${now.toISOString().slice(0,10)}. ${evidenceInstruction}`;
       })))}${legalDocs.length || matchedReferences.length ? '' : '\nNo matching legal excerpts were retrieved. The contact references below do not establish legal rules or deadlines. You may still offer a helpful general explanation without inventing specific rules.'}`;
 
   return [
-    { role: instructionRole, content: `${evidenceMode?pdfPrompt:systemPrompt}\n\n${references}\n\n${externalSearchInstruction(externalSearchResult)}\n\nRESPONSE LANGUAGE\n${languageInstruction(replyLanguage)}\n\n${evidenceMode?'':casualInstruction(message)}\n\n${legalVocabularyInstruction(message, semanticHistory)}\n\n${legalQuestionInstruction(interpretation)}\n\n${correctionInstruction(correction)}` },
+    { role: instructionRole, content: `${evidenceMode||compact?pdfPrompt:systemPrompt}\n\n${references}\n\n${externalSearchInstruction(externalSearchResult)}\n\nRESPONSE LANGUAGE\n${languageInstruction(replyLanguage)}\n\n${evidenceMode?'':casualInstruction(message)}\n\n${legalVocabularyInstruction(message, semanticHistory)}\n\n${legalQuestionInstruction(interpretation)}\n\n${correctionInstruction(correction)}` },
     ...reviewedVocabularyHistory(history)
       .filter(item => ['user', 'ai'].includes(item.sender) && typeof item.content === 'string' && item.content.trim())
       .map(item => ({ role: item.sender === 'user' ? 'user' : 'assistant', content: item.content })),

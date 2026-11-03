@@ -64,6 +64,14 @@ test('the published-source Rwanda overview stays usable without claiming that th
   assert.equal(chatRequestAllowed('Tell me about Gacaca courts today',cooldown,1000),false);
 });
 
+test('the dated theft comparison stays available during cooldown but current and case-specific comparisons do not',()=>{
+  const cooldown={until:678000,language:'en'};
+  const message='so the punishments for simple theft and aggravated theft are the same ..? right';
+  assert.equal(chatRequestAllowed(message,cooldown,1000),true);
+  assert.equal(cooldownAfterReply(message,cooldown),cooldown);
+  for(const question of ['Compare theft and aggravated theft under current law','Compare theft and aggravated theft for my client','Compare theft and aggravated theft in Kenya'])assert.equal(chatRequestAllowed(question,cooldown,1000),false);
+});
+
 test('account-access failures keep their safe code and do not masquerade as model quota or expired sign-in', () => {
   const error = chatReplyError({ status: 503, code: 'account_access_unavailable', error: 'Account access could not be verified. Try again.' });
   assert.equal(error.code, 'account_access_unavailable');

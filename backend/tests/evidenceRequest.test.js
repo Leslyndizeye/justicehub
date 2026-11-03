@@ -89,3 +89,76 @@ test('persistent oversize requests fail after one retry with useful localized co
   await assert.rejects(provider.reply({message:modelQuestion,legalDocs:docs,signal:controller.signal}),{name:'AbortError'});
   assert.equal(calls,1);
 });
+
+test('web-only requests budget instructions, history and whole sources without requiring structured PDF output',()=>{
+  const input={message:'Compare the penalties for theft under current law',history:[1,2,3,4].map(number=>({sender:number%2?'user':'ai',content:'Earlier account of the issue. '.repeat(80)})),legalDocs:[],routing:{kind:'legal'},language:'en',research,evidenceMode:false,now:new Date('2026-11-03')};
+  const original=JSON.stringify(input);
+  for(const compact of [false,true]) {
+    const request=prepareEvidenceRequest(input,compact);
+    assert.ok(request.size<=(compact?12000:18000));
+    assert.equal(request.messages.at(-1).content,input.message);
+    assert.equal(request.bundle,undefined);
+    assert.match(request.messages[0].content,/fabricate evidence|false testimony/);
+    assert.match(request.messages[0].content,/not proof of current applicability|not a continuously consolidated/);
+    assert.doesNotMatch(request.messages[0].content,/Return only one JSON object/);
+    for(const source of request.research.sources)assert.ok(request.messages[0].content.includes(source.excerpt));
+  }
+  assert.equal(JSON.stringify(input),original);
+});
+
+test('oversized secondary web evidence is omitted as a whole and never appended as an unused citation',async()=>{
+  const kept={title:'Primary tax source',url:'https://www.rra.gov.rw/kept',excerpt:'The supplied page concerns tax law.',evidence:'page_excerpt'};
+  const omitted={title:'Long secondary tax source',url:'https://www.rra.gov.rw/omitted',excerpt:'Large secondary page. '.repeat(1200),evidence:'page_excerpt'};
+  const input={status:'ok',provider:'tavily',sources:[kept,omitted],retrievedAt:'2026-11-03'};
+  const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',externalSearch:{async lookup(){return input;}},client:{chat:{completions:{async create(request){
+    assert.ok(request.messages.reduce((n,item)=>n+item.content.length,0)<=18000);
+    assert.ok(request.messages[0].content.includes(kept.excerpt));
+    assert.ok(!request.messages[0].content.includes(omitted.url));
+    return {choices:[{message:{content:'This source does not establish the requested tax penalty.'}}]};
+  }}}}});
+  const reply=await provider.reply({message:'What is the latest tax penalty?',legalDocs:[],replyLanguage:'en'});
+  assert.ok(reply.includes(kept.url));assert.ok(!reply.includes(omitted.url));
+  assert.equal(input.sources.length,2);
+});
+
+test('web-only size failures retry once with smaller context and do not repeat search',async()=>{
+  for(const failure of [{status:413},{status:400,error:{code:'context_length_exceeded'}}]) {
+    const requests=[];let lookups=0;
+    const question='What is the current penalty for aggravated theft in Rwanda?';
+    const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',externalSearch:{async lookup(){lookups++;return research;}},client:{chat:{completions:{async create(request){
+      requests.push(request);
+      if(requests.length===1)throw Object.assign(new Error('Private diagnostic'),failure);
+      return {choices:[{message:{content:'I could not verify the applicable theft provision from these income-tax sources.'}}]};
+    }}}}});
+    const reply=await provider.reply({message:question,legalDocs:[],replyLanguage:'en',history:[{sender:'user',content:'Earlier question. '.repeat(160)}]});
+    assert.equal(requests.length,2);assert.equal(lookups,1);
+    assert.ok(requests[1].messages.reduce((n,item)=>n+item.content.length,0)<requests[0].messages.reduce((n,item)=>n+item.content.length,0));
+    for(const request of requests) {
+      assert.equal(request.messages.at(-1).content,question);
+      assert.equal(request.response_format,undefined);
+      assert.equal(request.tools,undefined);
+      assert.match(request.messages[0].content,/income-tax research/);
+    }
+    assert.doesNotMatch(reply,/Private diagnostic|too large|shorter question/);
+  }
+});
+
+test('persistent web-only oversize fails after two attempts; abort and visible tokens prevent retry',async()=>{
+  const question='Explain the latest fraud law';
+  let calls=0;
+  const provider=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',client:{chat:{completions:{async create(){calls++;throw Object.assign(new Error('Private'),{status:413});}}}}});
+  await assert.rejects(provider.reply({message:question,legalDocs:[]}),error=>{
+    assert.equal(publicChatError(error).status,413);
+    assert.doesNotMatch(publicChatError(error).error,/Private|shorter|too large/);
+    return true;
+  });
+  assert.equal(calls,2);
+  const controller=new AbortController();calls=0;
+  const aborted=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',client:{chat:{completions:{async create(){calls++;controller.abort();throw Object.assign(new Error('Private'),{status:413});}}}}});
+  await assert.rejects(aborted.reply({message:question,signal:controller.signal}),{name:'AbortError'});
+  assert.equal(calls,1);
+  calls=0;const tokens=[];
+  const streamed=createChatProvider({model:'openai/gpt-oss-120b',fallbackModel:'none',client:{chat:{completions:{async create(){calls++;return (async function*(){yield {choices:[{delta:{content:'A partial answer'}}]};throw Object.assign(new Error('Private'),{status:413});})();}}}}});
+  await assert.rejects(streamed.reply({message:'Explain Rwanda tax law',streaming:true,onEvent:(name,data)=>{if(name==='token')tokens.push(data.text);}}),{status:413});
+  assert.equal(calls,1);assert.equal(tokens.join(''),'A partial answer');
+});

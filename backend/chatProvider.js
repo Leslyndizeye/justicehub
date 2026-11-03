@@ -1,9 +1,8 @@
-import { buildChatMessages } from './chatPrompt.js';
 import { createSearchTracker, searchOptions, webSearchEnabled } from './chatSearch.js';
 import { languageCopy, resolveReplyLanguage } from './chatLanguage.js';
 import { needsTranslation, translateReply } from './chatTranslation.js';
 import { interpretLegalQuestion } from './legalQuestion.js';
-import { referencedPenaltyAnswer } from './legalAnswer.js';
+import { referencedPenaltyAnswer, referencedTheftComparisonAnswer } from './legalAnswer.js';
 import { needsVocabularyReview, vocabularyIssues, correctedVocabularyReply, reviewedVocabularyHistory } from './chatVocabularyGuard.js';
 import { conversationCorrection } from './chatCorrection.js';
 import { casualReply } from '../shared/chatCasual.js';
@@ -95,7 +94,7 @@ export function publicChatError(error, language = 'en', stage = 'generate') {
     };
     return { status: 503, code, error: messages[language] || messages.en };
   }
-  if(error.status===413 || error.code==='request_too_large')return {status:413,code:'request_too_large',error:({en:'This request is too large to answer at once. Try a shorter question or start a new conversation.',rw:'Iki kibazo ni kirekire cyane ngo gisubizwe icyarimwe. Gerageza ikibazo kigufi cyangwa utangire ikiganiro gishya.',fr:'Cette demande est trop longue pour une seule réponse. Essayez une question plus courte ou une nouvelle conversation.'})[language] || copy.genericError};
+  if(error.status===413 || error.code==='request_too_large')return {status:413,code:'request_too_large',error:({en:'We couldn’t prepare this reply. Please try again.',rw:'Ntitwashoboye gutegura iki gisubizo. Ongera ugerageze.',fr:'La réponse n’a pas pu être préparée. Réessayez.'})[language] || copy.genericError};
   const failure = error.chatFailure || providerFailure(error);
   if (failure === 'request_timeout') return { status: 504, code: failure, error: copy.timeoutError };
   if (failure === 'provider_connection_failed') return { status: 502, code: failure, error: copy.connectionError };
@@ -195,7 +194,8 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       // A dated PDF cannot establish today's law or a later amendment.
       const currentVerification = /\b(?:latest|current|today|now|in force|still appl\w*|202[5-9]|new laws?|amend\w*|updated?|recent|agezweho|mashya|vuba|aujourd'hui|actuel\w*|modifi\w*|recent\w*)\b/i.test(message);
       let needsResearch = route.kind === 'legal' && (!pdfFirst || currentVerification || route.forceWeb);
-      const referencedAnswer = route.kind === 'legal' && !route.forceWeb && (employmentAgeAnswer(message, legalDocs, language)
+      const referencedAnswer = route.kind === 'legal' && !route.forceWeb && (referencedTheftComparisonAnswer(message,language)
+        || employmentAgeAnswer(message, legalDocs, language)
         || rwandaLawOverviewAnswer(message,legalDocs,language)
         || incomeTaxExemptionsAnswer(message, legalDocs, language)
         || ([undefined,'rule','explanation','amount'].includes(route.answerTask) && vatOverviewAnswer(message, legalDocs, language))
@@ -249,18 +249,20 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         if (index > 0) onEvent('status', { text: copy.fallback, webSearch: false });
         let recoveredLookup = false;
         for (let attempt = 0; attempt < 4; attempt++) {
-          const lookupNotice = externalSearch ? externalSearchNotice(externalSearchResult, language) : copy.lookupNotice;
-          const showLookupNotice = externalSearch ? Boolean(lookupNotice) : recoveredLookup;
           const search = createSearchTracker({ language });
           const gptOss = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(candidate);
           let context=boundedContext(reviewedVocabularyHistory(answerHistory),legalDocs);
           const evidenceMode=gptOss && context.legalDocs.some(doc=>doc.coverage && lawExcerptMetadata(doc) || isReviewedStatute(doc));
-          const prepared=evidenceMode ? prepareEvidenceRequest({message,role,...context,routing:route,language,correction,research:externalSearchResult,now:new Date(now()),repairReason},recoveredLookup) : null;
-          if(prepared)context=prepared.context;
-          const bundle=prepared?.bundle;
+          const prepared=prepareEvidenceRequest({message,role,...context,routing:route,language,correction,research:externalSearchResult,now:new Date(now()),repairReason,evidenceMode,
+            searchEnabled:needsResearch && !externalSearch && !recoveredLookup && webSearchEnabled(candidate,searchSetting),instructionRole:gptOss?'developer':'system'},recoveredLookup);
+          context=prepared.context;
+          const bundle=prepared.bundle;
+          const answerResearch=prepared.research;
+          const lookupNotice = externalSearch ? externalSearchNotice(answerResearch, language) : copy.lookupNotice;
+          const showLookupNotice = externalSearch ? Boolean(lookupNotice) : recoveredLookup;
           const request = {
             model: candidate,
-            messages: prepared?.messages || buildChatMessages({ message, role, ...context, routing:route, evidenceMode, correction, replyLanguage: language, externalSearchResult, searchEnabled: needsResearch && !externalSearch && !recoveredLookup && webSearchEnabled(candidate, searchSetting), now: new Date(now()), instructionRole: gptOss ? 'developer' : 'system' }),
+            messages: prepared.messages,
             temperature: evidenceMode ? 0.1 : 0.4,
             max_completion_tokens: route.kind === 'discussion' ? 512 : 2048,
             ...(evidenceMode ? {response_format:evidenceResponseFormat(bundle)} : externalSearch || !needsResearch ? { tool_choice: 'none' } : !recoveredLookup ? searchOptions(candidate, message, searchSetting) : {}),
@@ -375,9 +377,9 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
               cooldowns.delete(candidate);
               return safeReply;
             }
-            const sourceContext=boundedContext([],legalDocs).legalDocs;
+            const sourceContext=context.legalDocs;
             const suppliedReferences=[...sourceContext,...referencesForQuestion(interpretLegalQuestion(message,history))];
-            if(unsupportedArticleCitations(text,suppliedReferences,externalSearchResult).length || unsupportedFilingPeriod(text,sourceContext,externalSearchResult)) {
+            if(unsupportedArticleCitations(text,suppliedReferences,answerResearch).length || unsupportedFilingPeriod(text,sourceContext,answerResearch)) {
               const safeReply=sourceReadingReply(sourceContext,language,[route.context,message].filter(Boolean).join('\n'));
               if(streaming)onEvent('token',{text:safeReply});
               cooldowns.delete(candidate);
@@ -390,8 +392,8 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
             if (text.trim() && showLookupNotice) text = lookupNotice + text;
             const helpfulText = constructiveReply(text, copy);
             if (streaming && helpfulText !== text) onEvent('token', { text: helpfulText.slice(text.trim().length) });
-            const researchReply = externalSearch ? finishExternalReply(helpfulText, externalSearchResult, language) : search.finish(helpfulText);
-            const reply = finishLawReply(researchReply, boundedContext([], legalDocs).legalDocs, language);
+            const researchReply = externalSearch ? finishExternalReply(helpfulText, answerResearch, language) : search.finish(helpfulText);
+            const reply = finishLawReply(researchReply, sourceContext, language);
             if (streaming && reply !== researchReply) onEvent('token', {text:reply.slice(researchReply.length)});
             if (!reply) throw Object.assign(new Error('The AI returned an empty answer'), { code: 'empty_model_response' });
             if (externalSearchResult?.sources?.length) onEvent('status', { text: '', webSearch: true });
@@ -399,9 +401,9 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
             return reply;
           } catch (error) {
             signal?.throwIfAborted();
-            if(error.status===413) {
+            if(error.status===413 || errorDetails(error).code==='context_length_exceeded') {
               error.code='request_too_large';
-              if(evidenceMode && !recoveredLookup && !emittedText && attempt < 2) { recoveredLookup = true; continue; }
+              if(!recoveredLookup && !emittedText && !translatingDraft && attempt < 2) { recoveredLookup = true; continue; }
             }
             const failure = providerFailure(error, translatingDraft ? translationTimeout?.aborted : requestTimeout.aborted);
             error.chatPhase = translatingDraft ? 'translation' : 'answer';
