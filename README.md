@@ -70,7 +70,9 @@ The `.env` files are ignored by Git. Share filled-in files privately; the templa
 | `backend/.env` | `SUPABASE_ANON_KEY` | Legacy anonymous key for older utility clients. Protected API routes use the backend service key. |
 | `backend/.env` | `SUPABASE_SERVICE_ROLE_KEY` | Required backend-only privileged key for the protected API and private memory. Never place it in frontend variables. |
 | `backend/.env` | `FIREBASE_PROJECT_ID` | Firebase project whose ID tokens the memory API accepts. Defaults to `ireme-30164`; must match frontend authentication. |
-| `backend/.env` | `GROQ_API_KEY` | Required Groq API key. |
+| `backend/.env` | `GROQ_API_KEY` | Primary Groq API key; required in `primary` and `failover` modes. |
+| `backend/.env` | `GROQ_SECONDARY_API_KEY` | Optional second Groq key; backend only. |
+| `backend/.env` | `GROQ_ACCOUNT_MODE` | `primary` (default), `secondary` for an isolated test, or `failover` for temporary service errors. |
 | `backend/.env` | `GEMINI_API_KEY` | Optional backend-only key for natural read-aloud. Use a Free-tier Google project with billing disabled. |
 | `backend/.env` | `GEMINI_SPEECH_FREE_TIER` | Set `true` only after checking that the Gemini key's project is on Free with billing disabled. Defaults to disabled. |
 | `backend/.env` | `GEMINI_SPEECH_DAILY_LIMIT` | Maximum new audio generations per UTC day and backend process; defaults to `30`, clamped to `0..100`. This is an application limit, not a billing control. |
@@ -108,6 +110,8 @@ The default setup uses a **Free** Groq account. If you choose paid capacity for 
 Free access has request and token limits. Chat's retry time is an estimate, not confirmation that capacity has recovered. Repeated quota failures during both question interpretation and answer generation share increasing retry delays. The backend does not purchase credits or upgrade the account. Translation repair uses the existing Groq key and counts toward the same account's quotas. No separate paid translation service is configured. Grok is a separate xAI service whose [API has usage charges](https://docs.x.ai/developers/pricing).
 
 ### Groq and Render are separate accounts
+
+For a second-account test and automatic service fallback, follow [the connection guide](docs/groq-second-account.md). Both connections use the same application prompts and source checks. Quota, authentication and invalid-input errors do not cause account rotation. The default remains the existing primary account.
 
 Render hosts the backend; Groq supplies its chat model. Render does not provide or upgrade a Groq account. The connection is the backend environment variable `GROQ_API_KEY`.
 

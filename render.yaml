@@ -26,6 +26,8 @@ services:
         value: ireme-30164
       - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_ACCOUNT_MODE
+        value: primary
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_SPEECH_FREE_TIER

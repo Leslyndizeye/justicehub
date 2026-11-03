@@ -2,7 +2,7 @@
 // access, legal-answer generation, fine-tuning, or writes to a provider model.
 import 'dotenv/config';
 import assert from 'node:assert/strict';
-import Groq from 'groq-sdk';
+import {configuredGroqConnection} from '../groqConnections.js';
 import { createChatProvider } from '../chatProvider.js';
 import { researchTopics } from '../questionUnderstanding.js';
 import { chatErrorDiagnostic } from '../chatDiagnostics.js';
@@ -16,7 +16,7 @@ const cases = [
 ];
 const selected = process.argv[2] ? cases.filter(item => item.id === process.argv[2]) : cases;
 if (!selected.length) throw new Error(`Choose a case: ${cases.map(item => item.id).join(', ')}`);
-const client = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
+const {client} = configuredGroqConnection();
 const provider = createChatProvider({ client, model: process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-120b',
   fallbackModel: process.env.GROQ_FALLBACK_MODEL?.trim() || 'openai/gpt-oss-20b' });
 for (const item of selected) {

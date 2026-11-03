@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import Groq from 'groq-sdk';
+import {configuredGroqConnection} from './groqConnections.js';
 import supabase from './privateSupabase.js';
 import { createChatProvider, publicChatError } from './chatProvider.js';
 import { replyLanguages, resolveReplyLanguage } from './chatLanguage.js';
@@ -33,7 +33,8 @@ const speechProvider = configuredSpeechProvider();
 app.use('/api/speech', speechRouter({ provider: speechProvider }));
 
 // Our provider handles one fallback explicitly; do not let SDK retries multiply rate-limited requests.
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
+const {client:groq,mode:groqAccountMode}=configuredGroqConnection(process.env,{onAccount:account=>console.info('Chat connection selected:',account)});
+console.info('Chat connection mode:',groqAccountMode);
 const groqModel = process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-120b';
 const searchProvider = process.env.WEB_SEARCH_PROVIDER?.trim().toLowerCase() || 'tavily';
 const externalSearch = configuredSearchFallback(groq);

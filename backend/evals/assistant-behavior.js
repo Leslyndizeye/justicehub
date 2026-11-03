@@ -2,7 +2,7 @@
 // Never writes to the application database.
 import 'dotenv/config';
 import assert from 'node:assert/strict';
-import Groq from 'groq-sdk';
+import {configuredGroqConnection} from '../groqConnections.js';
 import { createChatProvider, publicChatError } from '../chatProvider.js';
 import { configuredSearchFallback } from '../searchFallback.js';
 import { resolveReplyLanguage } from '../chatLanguage.js';
@@ -218,7 +218,7 @@ const cases = [
 const selectedId = process.argv[2];
 const selected = selectedId ? cases.filter(item => ['everyday','conversation'].includes(selectedId) ? item.id.startsWith(`${selectedId}_`) : item.id === selectedId) : cases;
 if (!selected.length) throw new Error(`Choose a case: ${cases.map(item => item.id).join(', ')}`);
-const client = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
+const {client} = configuredGroqConnection();
 const provider = createChatProvider({
   client,
   model: process.env.GROQ_MODEL?.trim() || 'openai/gpt-oss-120b',

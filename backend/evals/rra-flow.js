@@ -2,12 +2,12 @@
 // This is a small behavior/latency check, not legal review or a performance SLA.
 import 'dotenv/config';
 import assert from 'node:assert/strict';
-import Groq from 'groq-sdk';
+import {configuredGroqConnection} from '../groqConnections.js';
 import {createChatProvider,publicChatError} from '../chatProvider.js';
 import {searchLegalDocs} from '../legalRetrieval.js';
 import {lawExcerptMetadata} from '../lawArticles.js';
 
-const provider=createChatProvider({client:new Groq({apiKey:process.env.GROQ_API_KEY,maxRetries:0}),
+const provider=createChatProvider({client:configuredGroqConnection().client,
   model:process.env.GROQ_MODEL?.trim()||'openai/gpt-oss-120b',
   fallbackModel:process.env.GROQ_FALLBACK_MODEL?.trim()||'openai/gpt-oss-20b',searchSetting:'false',
   reasoningEffort:process.env.GROQ_REASONING_EFFORT?.trim()||'medium',
