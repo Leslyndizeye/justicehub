@@ -72,6 +72,18 @@ test('the dated theft comparison stays available during cooldown but current and
   for(const question of ['Compare theft and aggravated theft under current law','Compare theft and aggravated theft for my client','Compare theft and aggravated theft in Kenya'])assert.equal(chatRequestAllowed(question,cooldown,1000),false);
 });
 
+test('misspelled closings and a source-backed clarification work during cooldown without claiming recovery',()=>{
+  const cooldown={until:678000,language:'en'};
+  const history=[{sender:'user',content:'Are simple theft and aggravated theft the same?'},{sender:'ai',content:'An earlier answer is not evidence.'}];
+  for(const message of ['okay go it','thasnlks no more quesitions','explain clearly']) {
+    assert.equal(chatRequestAllowed(message,cooldown,1000,history),true,message);
+    assert.equal(cooldownAfterReply(message,cooldown,history),cooldown,message);
+  }
+  assert.equal(chatRequestAllowed('explain clearly',cooldown,1000),false);
+  assert.equal(chatRequestAllowed('explain clearly',cooldown,1000,[...history,{sender:'user',content:'What is the current fraud law?'}]),false);
+  assert.equal(chatRequestAllowed('thanks, what is the current theft penalty?',cooldown,1000,history),false);
+});
+
 test('account-access failures keep their safe code and do not masquerade as model quota or expired sign-in', () => {
   const error = chatReplyError({ status: 503, code: 'account_access_unavailable', error: 'Account access could not be verified. Try again.' });
   assert.equal(error.code, 'account_access_unavailable');

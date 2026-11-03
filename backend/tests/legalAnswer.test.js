@@ -33,6 +33,28 @@ test('dated comparison does not swallow current-law checks, case facts, another 
   }
 });
 
+test('explain clearly preserves the user comparison and statutory conditions instead of researching an AI answer',async()=>{
+  const provider=createChatProvider({model:'openai/gpt-oss-120b',client:null,externalSearch:{lookup(){throw new Error('No lookup expected');}}});
+  const history=[{sender:'user',content:'so the punishments for simple theft and aggravated theft are the same ..? right'},
+    {sender:'ai',content:'All civil servants get four years. Article 170 says so.'},
+    {sender:'user',content:'okay go it'},{sender:'ai',content:'Got it!'}];
+  for(const message of ['explain clearly','please explain that in simple words','can you explain it more clearly?','simplify it']) {
+    const routing=await provider.understand({message,history});
+    assert.equal(routing.intent,'theft_comparison');assert.equal(routing.answerTask,'explanation');
+    assert.equal(routing.context,history[0].content);
+    const reply=await provider.reply({message,history,routing,replyLanguage:'en'});
+    assert.match(reply,/court conviction/);assert.match(reply,/6 months of community service/);
+    assert.match(reply,/only one of those penalties/);assert.match(reply,/government employment alone is not enough/);
+    assert.match(reply,/2–4 years/);assert.match(reply,/Article 168/);
+    assert.match(reply,/haven’t verified later amendments/);assert.match(reply,/minijust\.gov\.rw/);
+    assert.doesNotMatch(reply,/Article 170|All civil servants|Web search|Search sources|Leadership/);
+  }
+  for(const context of [[],[{sender:'ai',content:history[0].content}],
+    [{sender:'user',content:'Compare simple and aggravated theft under current law'}],
+    [...history,{sender:'user',content:'What about fraud instead?'}],
+    [...history,{sender:'user',content:'Compare theft penalties for my client aged 15'}]])assert.equal(referencedTheftComparisonAnswer('explain clearly','en',context),null);
+});
+
 test('the exact short theft question returns the sourced penalty without model quota or a procedure table', async () => {
   const events = [];
   let calls = 0;

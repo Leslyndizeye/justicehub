@@ -15,7 +15,7 @@ const noDatabase={from(){throw new Error('This scenario must use the local corpu
 const user=content=>({sender:'user',content});
 
 test('discussion-to-action follow-ups retain the new field across the whole field registry',()=>{
-  const requests=[['explain simply','discussion'],['what is the punishment?','penalty'],['what is the deadline?','deadline'],
+  const requests=[['explain simply','discussion'],['explain clearly','discussion'],['please explain that in simple words','discussion'],['what is the punishment?','penalty'],['what is the deadline?','deadline'],
     ['how much is it?','amount'],['how do i apply?','procedure'],['who qualifies?','eligibility'],
     ['what can i do next?','remedy'],['which source applies?','source'],['is it still in force?','current_verification']];
   for(const field of legalFields) {

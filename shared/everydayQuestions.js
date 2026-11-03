@@ -1,6 +1,6 @@
 import { questionWording } from './questionWording.js';
 import {rwandaLawOverviewQuestion} from './rwandaLawOverview.js';
-import {theftComparisonQuestion} from './theftComparison.js';
+import {theftComparisonContext} from './theftComparison.js';
 
 const fold = value => String(value || '').normalize('NFKD').replace(/\p{M}/gu, '').replace(/[‘’]/g, "'").toLowerCase().trim();
 const orientationIntents = new Set(['personal_feelings', 'wellbeing', 'violence_discussion']);
@@ -10,7 +10,8 @@ const exampleWords = new Set('can could would you u please give tell show me us 
 // These narrow, model-free orientations make no finding about a relationship's
 // legality, a diagnosis, or a statutory offence. Specific facts need retrieval.
 export function everydayQuestionRoute(message, history = []) {
-  if(theftComparisonQuestion(message))return {kind:'legal',intent:'theft_comparison',researchTopic:'theft aggravating circumstances'};
+  const comparison=theftComparisonContext(message,history);
+  if(comparison)return {kind:'legal',intent:'theft_comparison',researchTopic:'theft aggravating circumstances',...(comparison!==message?{context:comparison,answerTask:'explanation'}:{})};
   const text = fold(questionWording(message).normalized);
   if (/\b(?:online|internet|interineti|google|browse)\b/.test(text)) return null;
   if(rwandaLawOverviewQuestion(text))return {kind:'legal',intent:'rwanda_law_overview',researchTopic:'constitution rights equality'};

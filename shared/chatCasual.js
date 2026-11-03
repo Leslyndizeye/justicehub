@@ -22,10 +22,11 @@ function distance(left,right) {
 function politeClosing(text) {
   // Only classify a complete social phrase. These local typo readings never
   // rewrite saved messages, names, legal facts, code, links or mixed requests.
-  if(text.length>120 || /[^\p{L}\s.!?,;:'’\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F\u200D]/u.test(text))return null;
-  const folded=text.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/['’]/g,' ').replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ').trim();
+  if(text.length>120 || /^['’]|['’]$/.test(text) || /[^\p{L}\s.!?,;:'’\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F\u200D]/u.test(text))return null;
+  const folded=text.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/['’]/g,' ').replace(/[^\p{L}\s]/gu,' ').replace(/\s+/g,' ').trim();
   const normalized=folded.split(' ').map(word=>{
     if(word==='thankyou')return 'thank you';
+    if(['thank','thanks'].includes(word))return word;
     if(/^th/.test(word) && word.length>=5 && word.length<=8 && distance(word,'thanks')<=2)return 'thanks';
     if(/^q/.test(word) && word.length>=7 && word.length<=11 && distance(word,'questions')<=2)return 'questions';
     return word;

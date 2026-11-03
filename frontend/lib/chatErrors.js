@@ -1,20 +1,20 @@
 import { interpretCasualMessage } from '../../shared/chatCasual.js';
 import { everydayQuestionRoute, orientationRoute } from '../../shared/everydayQuestions.js';
 
-const modelFreeMessage = message => {
-  const route=everydayQuestionRoute(message);
+const modelFreeMessage = (message,history=[]) => {
+  const route=everydayQuestionRoute(message,history);
   return interpretCasualMessage(message)?.standalone===true||orientationRoute(route)||['rwanda_law_overview','theft_comparison'].includes(route?.intent);
 };
 const publicCodes = new Set(['account_access_unavailable', 'conversation_unavailable', 'message_not_saved', 'reply_not_saved']);
 
 /** Greetings/acknowledgements use the backend's shared rules and no model tokens. */
-export function chatRequestAllowed(message, cooldown, time = Date.now()) {
-  return !(cooldown?.until > time) || modelFreeMessage(message);
+export function chatRequestAllowed(message, cooldown, time = Date.now(), history = []) {
+  return !(cooldown?.until > time) || modelFreeMessage(message,history);
 }
 
 /** A successful canned reply does not establish that the provider quota recovered. */
-export function cooldownAfterReply(message, cooldown) {
-  return modelFreeMessage(message) ? cooldown : null;
+export function cooldownAfterReply(message, cooldown, history = []) {
+  return modelFreeMessage(message,history) ? cooldown : null;
 }
 
 /** Keep provider retry metadata when a streamed or JSON response fails. */

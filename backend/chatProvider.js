@@ -194,7 +194,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       // A dated PDF cannot establish today's law or a later amendment.
       const currentVerification = /\b(?:latest|current|today|now|in force|still appl\w*|202[5-9]|new laws?|amend\w*|updated?|recent|agezweho|mashya|vuba|aujourd'hui|actuel\w*|modifi\w*|recent\w*)\b/i.test(message);
       let needsResearch = route.kind === 'legal' && (!pdfFirst || currentVerification || route.forceWeb);
-      const referencedAnswer = route.kind === 'legal' && !route.forceWeb && (referencedTheftComparisonAnswer(message,language)
+      const referencedAnswer = route.kind === 'legal' && !route.forceWeb && (referencedTheftComparisonAnswer(message,language,history)
         || employmentAgeAnswer(message, legalDocs, language)
         || rwandaLawOverviewAnswer(message,legalDocs,language)
         || incomeTaxExemptionsAnswer(message, legalDocs, language)

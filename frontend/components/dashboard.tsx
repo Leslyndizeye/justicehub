@@ -422,7 +422,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
     let localReply = needsNameRecovery ? null : localMemoryReply(prompt, nextMemory, user.displayName, persisted, messages, nameLookupStatus.current, cloudReady.current ? 'account' : 'browser');
     // Keep the draft during the retry wait instead of creating another failed
     // turn on every click. Memory actions and model-free casual replies work.
-    if (!localReply && !needsNameRecovery && !chatRequestAllowed(prompt, rateLimit)) {
+    if (!localReply && !needsNameRecovery && !chatRequestAllowed(prompt, rateLimit, Date.now(), messages)) {
       streamRequest.current = null;
       return;
     }
@@ -476,7 +476,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         setMessages(prev => prev.map(m => m.id === replyId ? { ...m, content: localReply.reply, replyLanguage: localReply.language as ReplyLanguage, memoryKind: localReply.kind, streaming: false } : m));
         return;
       }
-      if (!chatRequestAllowed(prompt, rateLimit)) {
+      if (!chatRequestAllowed(prompt, rateLimit, Date.now(), messages)) {
         blockedByCooldown = true;
         const seconds = Math.ceil((rateLimit.until - Date.now()) / 1000);
         responseLanguage = rateLimit.language;
@@ -523,7 +523,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         }
       });
       if (streamRequest.current !== controller) return;
-      setRateLimit(previous => cooldownAfterReply(prompt, previous));
+      setRateLimit(previous => cooldownAfterReply(prompt, previous, messages));
       setMessages(prev => prev.map(m => m.id === replyId ? { ...m, content: result.reply, streaming: false } : m));
       void loadSessions();
 
