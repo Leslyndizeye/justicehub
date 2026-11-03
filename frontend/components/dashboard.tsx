@@ -420,7 +420,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
     const recall = nameRecallRequest(prompt, messages);
     const needsNameRecovery = Boolean(recall && nextMemory.enabled && nextMemory.recoverPreviousName && !nextMemory.items.some(item => item.kind === 'name') && nameLookupStatus.current !== 'checked');
     let localReply = needsNameRecovery ? null : localMemoryReply(prompt, nextMemory, user.displayName, persisted, messages, nameLookupStatus.current, cloudReady.current ? 'account' : 'browser');
-    // Keep the draft and existing countdown instead of creating another failed
+    // Keep the draft during the retry wait instead of creating another failed
     // turn on every click. Memory actions and model-free casual replies work.
     if (!localReply && !needsNameRecovery && !chatRequestAllowed(prompt, rateLimit)) {
       streamRequest.current = null;
@@ -658,7 +658,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         </div>
 
         {!conversationError && !conversationPending && <div className="chat-composer-area">
-          {rateLimit && <div role="status" className="chat-quota-notice">{rateLimitNotice(waitSeconds, rateLimit.language)}</div>}
+          {rateLimit && waitSeconds > 0 && <div role="status" className="chat-quota-notice">{rateLimitNotice(waitSeconds, rateLimit.language)}</div>}
           <div className="chat-composer">
             <textarea ref={composerRef} rows={1} value={currentPrompt} onChange={e => setCurrentPrompt(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}

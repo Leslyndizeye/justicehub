@@ -10,21 +10,22 @@ test('only rate-limit errors with a valid duration establish a cooldown', () => 
   }
 });
 
-test('countdown labels use the response language and do not promise quota availability', () => {
-  assert.match(rateLimitNotice(3333), /55:33/);
-  assert.match(rateLimitNotice(2), /at least 2 s/);
-  assert.match(rateLimitNotice(0), /may still be limited/);
-  assert.match(rateLimitNotice(12, 'rw'), /Tegereza nibura 12/);
-  assert.match(rateLimitNotice(12, 'fr'), /Attendez au moins 12/);
+test('retry notices omit quota and countdown details and disappear when the wait ends', () => {
+  assert.equal(rateLimitNotice(3333),'Please try again shortly.');
+  assert.equal(rateLimitNotice(2),'Please try again shortly.');
+  assert.equal(rateLimitNotice(0),'');
+  assert.equal(rateLimitNotice(-1),'');
+  assert.match(rateLimitNotice(12, 'rw'), /Ongera/);
+  assert.match(rateLimitNotice(12, 'fr'), /Réessayez/);
 });
 
-test('a quota failure keeps the changing countdown in the notice and makes no unverified memory claim',()=>{
+test('a rate-limit failure uses a brief message without quota terminology or unverified memory claims',()=>{
   for(const language of ['en','rw','fr']) {
     const failure=chatFailureNotice(chatReplyError({status:429,retryAfterSeconds:5}),language);
-    assert.doesNotMatch(failure,/5|memory|mémoire/i,'A saved failure must not show an expired countdown or assert storage health');
-    for(const seconds of [5,0])assert.doesNotMatch(rateLimitNotice(seconds,language),/memory|mémoire/i);
+    assert.doesNotMatch(failure,/5|quota|usage limit|retry notice below|rugero ntarengwa|limite d’utilisation|memory|mémoire/i);
+    for(const seconds of [5,0])assert.doesNotMatch(rateLimitNotice(seconds,language),/quota|usage limit|availability|memory|mémoire/i);
   }
-  assert.match(chatFailureNotice({status:429}),/usage limit/);
+  assert.match(chatFailureNotice({status:429}),/try again shortly/);
 });
 
 test('cooldown permits only shared model-free casual replies, not a substantive question added to one', () => {
