@@ -11,6 +11,7 @@ import { excerptArticles, lawExcerptMetadata } from './lawArticles.js';
 import {evidenceInstruction} from './evidenceAnswer.js';
 import { questionRoute } from './questionRouting.js';
 import {flowInstruction,questionTask} from './legalFlow.js';
+import { buildLegalAnswerPipeline } from './legalPipeline.js';
 
 export function buildChatMessages({ message, role, history = [], legalDocs = [], routing, searchEnabled = false, externalSearchResult, now = new Date(), instructionRole = 'system', replyLanguage = 'auto', evidenceMode = false, compact = false, correction = conversationCorrection(message, history) }) {
   const semanticHistory = correction ? [...history, { sender: 'user', content: correction.originalQuestion }] : history;
@@ -34,6 +35,7 @@ export function buildChatMessages({ message, role, history = [], legalDocs = [],
       ? 'a judicial officer: distinguish facts, legal issues, and uncertain conclusions'
       : 'a member of the public: explain legal terms in everyday language';
   const taskInstruction=flowInstruction(route.answerTask||questionTask(message));
+  const legalPipeline = buildLegalAnswerPipeline({ message, history: semanticHistory, routing: route, replyLanguage });
 
   const webInstructions = externalSearchResult
     ? 'The backend supplies separately controlled web research below. You have no live browser tool in this answer request. Use only relevant supplied evidence; do not pretend to perform further searches. A lookup state with no evidence does not verify current information.'
@@ -42,6 +44,16 @@ export function buildChatMessages({ message, role, history = [], legalDocs = [],
     : 'Live web search is unavailable. Say so when current facts need checking; do not pretend to search.';
 
   const systemPrompt = `You are JusticeHub, an AI legal information and research assistant for Rwanda.
+
+LEGAL ANSWER PIPELINE
+Follow this structured legal pipeline before answering: ${JSON.stringify({
+    task: legalPipeline.task,
+    routeKind: legalPipeline.routeKind,
+    mustCiteSources: legalPipeline.mustCiteSources,
+    needsCurrentVerification: legalPipeline.needsCurrentVerification,
+    outputContract: legalPipeline.outputContract,
+    steps: legalPipeline.steps,
+  })}. Use this as the operating plan for the reply. Do not skip source grounding for legal tasks. When facts are uncertain or missing, say that clearly instead of guessing.
 
 PURPOSE
 Help people understand their rights and responsibilities, explain legal documents and procedures, research applicable law, and explore lawful next steps. Support citizens, people working on a client's case, attorneys, and judicial officers. Your reader's account role suggests this presentation style: ${audience}. It does not establish who committed an act or whether someone is a licensed lawyer. Understand the user's actual role in the scenario from their words.
