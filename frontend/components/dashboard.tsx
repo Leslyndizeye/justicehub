@@ -20,6 +20,8 @@ import DeleteConversationDialog from './DeleteConversationDialog';
 import { createAmbientRain } from '../lib/ambientRain.js';
 import { recoveryState, requestError } from '../lib/recoveryState.js';
 import { chatStatusLabel } from '../../shared/chatPresentation.js';
+import {memoryContextForChat} from '../../shared/memoryContext.js';
+import MemorySettings from './MemorySettings';
 
 const API = apiBaseUrl(import.meta.env.VITE_API_URL, import.meta.env.DEV);
 type ReplyLanguage = 'auto' | 'rw' | 'en' | 'fr';
@@ -62,6 +64,10 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
     catch { return normalizeMemory(null); }
   });
   const memoryRef = useRef(initialMemory);
+  const memoryOwner=useRef(user.uid);
+  const [memory,setMemory]=useState(initialMemory);
+  const [memoryOpen,setMemoryOpen]=useState(false);
+  const [memoryLoadAttempt,setMemoryLoadAttempt]=useState(0);
   const nameLookupStatus = useRef('unchecked');
   const [memoryPersistent, setMemoryPersistent] = useState(() => {
     try { localStorage.getItem('justicehub-storage-check'); return true; } catch { return false; }
@@ -69,6 +75,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
   const [memoryCloudState, setMemoryCloudState] = useState('loading');
   const cloudRevision = useRef(0);
   const cloudReady = useRef(false);
+  const cloudConflict=useRef(false);
   const cloudQueue = useRef<Promise<unknown>>(Promise.resolve());
   const cloudWriteSequence = useRef(0);
   const memoryLifecycle = useRef(new AbortController());
@@ -184,9 +191,11 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
   }, [rateLimit]);
 
   const saveMemory = async (next: ReturnType<typeof normalizeMemory>) => {
+    if(memoryOwner.current!==user.uid)return false;
     const normalized = normalizeMemory(next);
     if (normalized.recoverPreviousName !== memoryRef.current.recoverPreviousName || normalized.enabled !== memoryRef.current.enabled) nameLookupStatus.current = 'unchecked';
     memoryRef.current = normalized;
+    setMemory(normalized);
 
     let stored = false;
     try { stored = Boolean(user && writeLocalMemory(user.uid, normalized, localStorage)); } catch { /* Private storage may be unavailable. */ }
@@ -211,6 +220,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         if (lifecycle.signal.aborted) return stored;
         cloudReady.current = false;
         const conflict = error instanceof Error && 'status' in error && error.status === 409;
+        if(conflict)cloudConflict.current=true;
         setMemoryCloudState(conflict ? 'conflict' : 'local');
         if (import.meta.env.DEV) console.warn('Account memory save failed:', conflict ? 'memory_conflict' : 'memory_unavailable');
 
@@ -225,6 +235,17 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
     const controller = new AbortController();
     memoryLifecycle.current = controller;
     cloudReady.current = false;
+    cloudRevision.current=0;
+    cloudWriteSequence.current++;
+    // Reload this owner's browser document before a cloud migration. Never
+    // migrate the previous signed-in user's in-memory notes into a new account.
+    let local=normalizeMemory(null);
+    try {local=readLocalMemory(user.uid,localStorage);} catch {}
+    memoryRef.current=local;
+    if(memoryOwner.current!==user.uid)cloudConflict.current=false;
+    memoryOwner.current=user.uid;
+    setMemory(local);
+    nameLookupStatus.current='unchecked';
     setMemoryCloudState('loading');
 
     void (async () => {
@@ -234,7 +255,9 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         const next = initialAccountMemory(remote, memoryRef.current);
         cloudRevision.current = remote.revision;
         cloudReady.current = true;
+        cloudConflict.current=false;
         memoryRef.current = next;
+        setMemory(next);
 
         nameLookupStatus.current = 'unchecked';
         try { setMemoryPersistent(writeLocalMemory(user.uid, next, localStorage)); } catch { setMemoryPersistent(false); }
@@ -247,7 +270,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
       }
     })();
     return () => { controller.abort(); cloudReady.current = false; };
-  }, [accountMemory, user.uid]);
+  }, [accountMemory, user.uid, memoryLoadAttempt]);
 
   useEffect(() => {
     if (!user) return;
@@ -256,8 +279,10 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
       try {
         const next = readLocalMemory(user.uid, localStorage);
         memoryRef.current = next;
+        setMemory(next);
 
         cloudReady.current = false;
+        cloudConflict.current=true;
         setMemoryCloudState('conflict');
         if (import.meta.env.DEV) console.warn('Account memory changed in another tab; refresh to synchronize.');
       } catch { /* Another tab may have disabled storage. */ }
@@ -403,7 +428,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
   };
 
   const sendMessage = async () => {
-    if (!currentPrompt.trim() || streamRequest.current || !user || memoryCloudState === 'loading' || messagesLoading || activeSessionId && (!sessionsReady || messagesError)) return;
+    if (!currentPrompt.trim() || streamRequest.current || !user || memoryOwner.current!==user.uid || memoryCloudState === 'loading' || messagesLoading || activeSessionId && (!sessionsReady || messagesError)) return;
 
     const prompt = currentPrompt.trim();
     const controller = new AbortController();
@@ -416,7 +441,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
     let fullText = '';
     let nextMemory = captureMemory(memoryRef.current, prompt);
     let persisted = JSON.stringify(nextMemory) !== JSON.stringify(memoryRef.current) ? await saveMemory(nextMemory) : memoryPersistent || cloudReady.current;
-    if (controller.signal.aborted) { streamRequest.current = null; return; }
+    if (controller.signal.aborted || memoryOwner.current!==user.uid) { controller.abort(); streamRequest.current = null; return; }
     const recall = nameRecallRequest(prompt, messages);
     const needsNameRecovery = Boolean(recall && nextMemory.enabled && nextMemory.recoverPreviousName && !nextMemory.items.some(item => item.kind === 'name') && nameLookupStatus.current !== 'checked');
     let localReply = needsNameRecovery ? null : localMemoryReply(prompt, nextMemory, user.displayName, persisted, messages, nameLookupStatus.current, cloudReady.current ? 'account' : 'browser');
@@ -482,6 +507,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         responseLanguage = rateLimit.language;
         throw chatReplyError({ status: 429, retryAfterSeconds: seconds, error: rateLimitNotice(seconds, rateLimit.language) });
       }
+      if(memoryOwner.current!==user.uid){controller.abort();return;}
       const res = await fetch(`${API}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -491,6 +517,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
           sessionId: activeSessionId,
           message: prompt,
           role: userRole,
+          memoryContext:memoryContextForChat(memoryRef.current,cloudConflict.current),
           stream: true,
         }),
       });
@@ -576,6 +603,8 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
 
   return (
     <div className="justice-chat">
+      {memoryOpen&&memoryOwner.current===user.uid&&<MemorySettings memory={memory} status={memoryCloudState} persistent={memoryPersistent} disabled={isAnalysing||Boolean(streamRequest.current)}
+        onSave={saveMemory} onReload={()=>setMemoryLoadAttempt(attempt=>attempt+1)} onClose={()=>{setMemoryOpen(false);requestAnimationFrame(()=>{if(historyToggleRef.current?.getClientRects().length)historyToggleRef.current.focus();});}}/>}
       <div className="chat-ambient" aria-hidden="true" />
       {rainActive && <RainEffect />}
       {historyOpen && <button type="button" className="chat-drawer-backdrop" aria-label="Close chat history" tabIndex={-1} onClick={() => setHistoryOpen(false)} />}
@@ -611,6 +640,7 @@ const Dashboard: React.FC<{ user: User; role: string }> = ({ user, role: userRol
         </nav>
 
         <div className="chat-sidebar-bottom">
+          <button type="button" className="chat-ambient-button" disabled={isAnalysing||Boolean(streamRequest.current)} onClick={()=>{if(streamRequest.current)return;setHistoryOpen(false);setMemoryOpen(true);}}>Memory</button>
           <button type="button" onClick={() => void toggleRain()} className={`chat-ambient-button ${rainActive ? 'is-active' : ''}`} aria-pressed={rainActive}>
             <CloudRain size={17} aria-hidden="true" /><span>Ambient rain</span><span className="chat-toggle-track" aria-hidden="true"><span /></span>
           </button>

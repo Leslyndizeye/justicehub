@@ -1,12 +1,12 @@
 // Dialogue-grounded local extraction. Facts must come from the person's own statements.
-export const memoryCategories = ['note', 'response_style', 'language', 'language_ability', 'occupation', 'education', 'project', 'goal', 'location', 'skills', 'interests', 'constraints', 'budget', 'hardware', 'deployment'];
-export const memoryCategoryLabels = { note: 'Saved note', response_style: 'Response preference', language: 'Language preference', language_ability: 'Languages spoken', occupation: 'Work', education: 'Study', project: 'Project', goal: 'Goal', location: 'General location', skills: 'Skills', interests: 'Interests', constraints: 'Project constraints', budget: 'Project budget', hardware: 'Computer', deployment: 'Hosting requirements' };
+export const memoryCategories = ['note', 'case_context', 'response_style', 'language', 'language_ability', 'occupation', 'education', 'project', 'goal', 'location', 'skills', 'interests', 'constraints', 'budget', 'hardware', 'deployment'];
+export const memoryCategoryLabels = { note: 'Saved note', case_context:'Case context', response_style: 'Response preference', language: 'Language preference', language_ability: 'Languages spoken', occupation: 'Work', education: 'Study', project: 'Project', goal: 'Goal', location: 'General location', skills: 'Skills', interests: 'Interests', constraints: 'Project constraints', budget: 'Project budget', hardware: 'Computer', deployment: 'Hosting requirements' };
 export function memoryCategoryMatches(category, group) {
   return category === group || group === 'constraints' && ['budget', 'hardware', 'deployment'].includes(category)
     || group === 'language' && category === 'language_ability';
 }
 
-const privateOrCase = /\b(?:password|api[ _-]?key|secret|passport|national id|born|birthday|date of birth|home address|street|avenue|house number|phone|email|bank|account number|client|patient|court case|accused|arrested|stole|criminal record|immigration|diagnos\w*|illness|medical|health|political|religion|ijambo ry['’]ibanga|indangamuntu|umukiriya|urubanza|naribye|uburwayi|navutse|mot de passe)\b|https?:\/\/|[^\s]+@[^\s]+\.[a-z]+|\b\d{9,}\b|\b(?:gsk_|sk-|tvly-|sb_secret_|eyJ)[A-Za-z0-9_-]{12,}/i;
+const privateOrCase = /\b(?:password|api[ _-]?key|secret|passport|national id|born|birthday|date of birth|home address|street|avenue|house number|phone|email|bank|account number|client|patient|court case|my case|my appeal|my dispute|my lawsuit|mon dossier|accused|arrested|stole|criminal record|immigration|diagnos\w*|illness|medical|health|political|religion|ijambo ry['’]ibanga|indangamuntu|umukiriya|urubanza|naribye|uburwayi|navutse|mot de passe)\b|https?:\/\/|[^\s]+@[^\s]+\.[a-z]+|\b\d{9,}\b|\b(?:gsk_|sk-|tvly-|sb_secret_|eyJ)[A-Za-z0-9_-]{12,}/i;
 const hypothetical = /\b(?:imagine|suppose|pretend|hypothetical|for example|if i|if my|niba|urugero|imaginons|supposons|par exemple|si je)\b/i;
 const temporary = /\b(?:today|tonight|just now|this morning|this afternoon|this week|currently visiting|on holiday|uyu munsi|uyu mugoroba|aujourd'hui|ce soir)\b/i;
 const uncertain = /\b(?:maybe|perhaps|might|not sure|possibly|probably|bishoboka|peut.[eê]tre|je ne sais pas)\b/i;
@@ -40,6 +40,7 @@ function responsePreference(sentence) {
 }
 
 function classify(sentence) {
+  if(/\b(?:cases?|lawsuit|litigation|courts?|hearing|appeal|dispute|dossier|proc[eè]s|urubanza)\b/i.test(sentence))return null;
   if (/^(?:i (?:don't|do not) (?:like|want)|please (?:don't|do not)|don't)\b/i.test(sentence)
       && /\b(?:long|complicated|technical) (?:answers|responses|explanations)\b/i.test(sentence)) return 'response_style';
   if (negation.test(sentence)) return null;
@@ -114,9 +115,10 @@ export function extractMemoryRetractions(message) {
 
 export function forgottenCategory(message) {
   const text = message.trim().replace(/[.!?]+$/, '');
-  const match = text.match(/^(?:forget (?:my |the )?|ibagirwa |oublie (?:mon |ma |mes )?)(job|work|profession|occupation|study|studies|education|project|goal|preferences|response preference|language|location|city|skills|interests|constraints|budget|akazi|amasomo|umushinga|intego|ururimi|aho ntuye|ubumenyi|langue|ville|comp[eé]tences|[eé]tudes|projet|objectif|int[eé]r[eê]ts|contraintes)$/i);
+  const match = text.match(/^(?:forget (?:my |the )?|ibagirwa |oublie (?:mon |ma |mes )?)(case|case details|case context|urubanza|dossier|job|work|profession|occupation|study|studies|education|project|goal|preferences|response preference|language|location|city|skills|interests|constraints|budget|akazi|amasomo|umushinga|intego|ururimi|aho ntuye|ubumenyi|langue|ville|comp[eé]tences|[eé]tudes|projet|objectif|int[eé]r[eê]ts|contraintes)$/i);
   if (!match) return null;
   const word = match[1].toLowerCase();
+  if(/^(?:case|case details|case context|urubanza|dossier)$/.test(word))return 'case_context';
   if (/^(?:job|work|profession|occupation|akazi)$/.test(word)) return 'occupation';
   if (/^(?:study|studies|education|amasomo|[eé]tudes)$/.test(word)) return 'education';
   if (/^(?:project|umushinga|projet)$/.test(word)) return 'project';

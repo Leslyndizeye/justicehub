@@ -27,6 +27,7 @@ import {applicationClarification} from './legalApplicationGuard.js';
 import {isReviewedStatute} from './criminalProvisions.js';
 import {generalDiscussionIssue} from './generalDiscussion.js';
 import {taskClarification} from './legalFlow.js';
+import {memoryRoutingHistory} from '../shared/memoryContext.js';
 
 function errorDetails(error) {
   const detail = error.error?.error || error.error || {};
@@ -146,15 +147,16 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
   const lawExplanations = createLawExplanationCache();
   const models = [...new Set([model, fallbackModel].filter(value => value && value !== 'none'))];
   return {
-    async understand({ message, history = [], signal }) {
+    async understand({ message, history = [], memoryContext = [], signal }) {
       signal?.throwIfAborted();
-      const local = questionRoute(message, history);
+      const contextHistory=memoryRoutingHistory(history,memoryContext);
+      const local = questionRoute(message, contextHistory);
       if (!needsQuestionUnderstanding(message, local)) return local;
       for (const candidate of models) {
         if ((cooldowns.get(candidate)?.until || 0) > now()) continue;
         const timeout = AbortSignal.timeout(Math.min(requestTimeoutMs, 10000));
         try {
-          const route = await inferQuestionRoute({ client, model: candidate, message, history,
+          const route = await inferQuestionRoute({ client, model: candidate, message, history:contextHistory,memoryContext,
             signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
           return route || local;
         } catch (error) {
@@ -166,7 +168,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
       }
       return local;
     },
-    async reply({ message, role, history, legalDocs, routing, replyLanguage = 'auto', streaming, signal, onEvent = () => {} }) {
+    async reply({ message, role, history, legalDocs, routing, memoryContext = [], replyLanguage = 'auto', streaming, signal, onEvent = () => {} }) {
       const language = resolveReplyLanguage(message, history, replyLanguage);
       const copy = languageCopy(language);
       const correction = conversationCorrection(message, history);
@@ -176,7 +178,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         if (streaming) onEvent('token', { text: greeting });
         return greeting;
       }
-      const route = routing || questionRoute(message, history);
+      const route = routing || questionRoute(message, memoryRoutingHistory(history,memoryContext));
       legalDocs=legalDocs?.filter(doc=>sourceMatchesTopic(doc,[route.context,message].filter(Boolean).join('\n')));
       const orientation = everydayQuestionReply(route, language);
       if (orientation) {
@@ -204,7 +206,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
         if (streaming) onEvent('token', { text: referencedAnswer });
         return referencedAnswer;
       }
-      const reusableKey = !needsResearch && !route.context && !correction
+      const reusableKey = !memoryContext.length && !needsResearch && !route.context && !correction
         ? reusableLawExplanation(message, legalDocs || [], language, role) : null;
       // Reusable article questions contain only public source identifiers.
       // Omit earlier case history before generation so no private facts can
@@ -253,7 +255,7 @@ export function createChatProvider({ client, model, fallbackModel = 'openai/gpt-
           const gptOss = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(candidate);
           let context=boundedContext(reviewedVocabularyHistory(answerHistory),legalDocs);
           const evidenceMode=gptOss && context.legalDocs.some(doc=>doc.coverage && lawExcerptMetadata(doc) || isReviewedStatute(doc));
-          const prepared=prepareEvidenceRequest({message,role,...context,routing:route,language,correction,research:externalSearchResult,now:new Date(now()),repairReason,evidenceMode,
+          const prepared=prepareEvidenceRequest({message,role,...context,routing:route,language,correction,memoryContext,research:externalSearchResult,now:new Date(now()),repairReason,evidenceMode,
             searchEnabled:needsResearch && !externalSearch && !recoveredLookup && webSearchEnabled(candidate,searchSetting),instructionRole:gptOss?'developer':'system'},recoveredLookup);
           context=prepared.context;
           const bundle=prepared.bundle;

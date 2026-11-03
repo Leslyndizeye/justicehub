@@ -296,3 +296,21 @@
   .chat-sidebar, .chat-workspace { background: rgba(24, 24, 24, .96); }
 }
 .chat-memory-notice { color: #a3a3a3; font-size: 11px; line-height: 1.5; margin: 8px 0; }
+.chat-memory-dialog { width: min(590px, calc(100vw - 32px)); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+.chat-memory-dialog h3 { font-size: 15px; margin: 22px 0 12px; }
+.chat-memory-controls { display: grid; gap: 12px; margin-top: 22px; }
+.chat-memory-dialog label { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.6; }
+.chat-memory-dialog input[type=checkbox] { flex: none; margin-top: 5px; accent-color: var(--chat-accent); }
+.chat-memory-dialog p { font-size: 12px; }
+.chat-memory-items { list-style: none; padding: 0; display: grid; gap: 12px; }
+.chat-memory-items li { display: flex; gap: 12px; justify-content: space-between; align-items: flex-start; padding: 12px; background: rgba(255,255,255,.04); border-radius: 12px; }
+.chat-memory-items li div { min-width: 0; }
+.chat-memory-items strong { font-size: 12px; }
+.chat-memory-items p { white-space: pre-wrap; }
+.chat-memory-dialog .chat-memory-note-label { margin: 22px 0 8px; }
+.chat-memory-dialog textarea { width: 100%; box-sizing: border-box; resize: vertical; border: 1px solid rgba(255,255,255,.2); border-radius: 12px; padding: 10px; color: var(--chat-ink); background: rgba(255,255,255,.04); font: inherit; font-size: 14px; }
+.chat-memory-dialog .chat-memory-case { margin-top: 12px; }
+.chat-memory-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.chat-memory-items button, .chat-memory-actions button { flex: none; border: 1px solid rgba(255,255,255,.17); border-radius: 9px; padding: 7px 10px; color: var(--chat-ink); background: rgba(255,255,255,.04); cursor: pointer; font: inherit; font-size: 12px; }
+.chat-memory-dialog .chat-memory-feedback { min-height: 20px; }
+.chat-memory-dialog :is(button,input,textarea):focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 3px; }

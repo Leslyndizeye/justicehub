@@ -2,7 +2,7 @@
 import { extractImportantFacts, extractMemoryRetractions, memoryStatements, forgottenCategory, memoryCategoryMatches, memoryCategories, memoryCategoryLabels } from './memoryFacts.js';
 
 export function sensitiveMemory(value) {
-  return /\b(?:password|api[ _-]?key|secret[ _-]?key|national id|passport|ijambo ry['’]ibanga|indangamuntu)\b|\b(?:gsk_|sk-|tvly-|sb_secret_|eyJ)[A-Za-z0-9_-]{12,}|-----BEGIN .*PRIVATE KEY-----|\b\d{16}\b/i.test(value);
+  return /\b(?:password|api[ _-]?key|secret[ _-]?key|national id|passport|ijambo ry['’]ibanga|indangamuntu)\b|\b(?:gsk_|sk-|tvly-|sb_secret_|eyJ)[A-Za-z0-9_-]{12,}|\b(?:AIza|AQ\.)[A-Za-z0-9_-]{30,}|-----BEGIN .*PRIVATE KEY-----|\b\d{16}\b/i.test(value);
 }
 
 function validPersonalName(value) {
@@ -21,6 +21,7 @@ export function normalizeMemory(input) {
     if (item.kind === 'name' && !validPersonalName(value)) continue;
     if (sensitiveMemory(value)) continue;
     const category = item.kind === 'name' ? 'name' : memoryCategories.includes(item.category) ? item.category : 'note';
+    if(category==='case_context'&&item.origin==='automatic')continue;
     if (!value || items.some(saved => saved.kind === item.kind && (item.kind === 'name' || saved.value === value && saved.category === category))) continue;
     if (item.kind === 'note' && items.filter(saved => saved.kind === 'note').length >= 16) continue;
     items.push({ id: typeof item.id === 'string' ? item.id.slice(0, 80) : `item-${items.length}`, kind: item.kind, value, category, origin: item.origin === 'automatic' ? 'automatic' : 'manual' });
@@ -28,7 +29,7 @@ export function normalizeMemory(input) {
   }
   return { version: 1, enabled: input?.enabled !== false, useProfileName: input?.useProfileName !== false,
     recoverPreviousName: input?.recoverPreviousName !== false && !(input?.recoverPreviousName == null && input?.useProfileName === false),
-    autoSave: input?.autoSave !== false,
+    autoSave: input?.autoSave !== false, shareWithAI: input?.shareWithAI === true,
     ignoredCategories: Array.isArray(input?.ignoredCategories) ? [...new Set(input.ignoredCategories.filter(category => memoryCategories.includes(category) && category !== 'note'))] : [], items };
 }
 
@@ -49,8 +50,9 @@ export function addMemoryNote(input, text, id = () => crypto.randomUUID(), optio
   const category = memoryCategories.includes(options.category) ? options.category : 'note';
   if (memory.items.some(item => item.kind === 'note' && (item.value === value && (category === 'note' || item.category === category) || item.category === category && normalizedText(item.value) === normalizedText(value)))) return memory;
   const origin = options.origin === 'automatic' ? 'automatic' : 'manual';
+  if(category==='case_context'&&origin==='automatic')return memory;
   if (origin === 'automatic' && memory.ignoredCategories.some(ignored => memoryCategoryMatches(category, ignored))) return memory;
-  const retained = memory.items.filter(item => item.kind === 'note' && (category === 'note' || item.category !== category));
+  const retained = memory.items.filter(item => item.kind === 'note' && (['note','case_context'].includes(category) || item.category !== category));
   // Never silently evict an existing note when the bounded memory is full.
   if (retained.length >= 16) return memory;
   const notes = [...retained, { id: id(), kind: 'note', value, category, origin }];
@@ -63,6 +65,8 @@ function memoryControl(message) {
   if (/^(?:disable|turn off) (?:saved )?memory$|^zimya memory$|^d[eé]sactive (?:la )?m[eé]moire$/.test(text)) return { field: 'enabled', value: false };
   if (/^(?:enable|resume|turn on) automatic (?:memory|saving)$/.test(text)) return { field: 'autoSave', value: true };
   if (/^(?:disable|stop|turn off) automatic (?:memory|saving)$/.test(text)) return { field: 'autoSave', value: false };
+  if (/^(?:use|share) (?:my )?saved (?:memory|details) in (?:ai )?(?:answers|replies)$/.test(text)) return {field:'shareWithAI',value:true};
+  if (/^(?:stop using|do not use|don't use) (?:my )?saved (?:memory|details) in (?:ai )?(?:answers|replies)$/.test(text)) return {field:'shareWithAI',value:false};
   return null;
 }
 
@@ -73,7 +77,7 @@ export function captureMemory(input, message, id = () => crypto.randomUUID(), op
   if (control) return { ...memory, [control.field]: control.value };
   if (/^(?:forget (?:my name|everything(?: you remember)?(?: about me)?)|ibagirwa (?:izina ryanjye|byose)|oublie (?:mon nom|tout))\s*[.!?]*$/i.test(text)) {
     const nameOnly = /my name|izina ryanjye|mon nom/i.test(text);
-    return { ...memory, useProfileName: false, recoverPreviousName: false, autoSave: nameOnly ? memory.autoSave : false, items: nameOnly ? memory.items.filter(item => item.kind !== 'name') : [] };
+    return { ...memory, useProfileName: false, recoverPreviousName: false, autoSave: nameOnly ? memory.autoSave : false, shareWithAI:nameOnly?memory.shareWithAI:false, items: nameOnly ? memory.items.filter(item => item.kind !== 'name') : [] };
   }
   if (!memory.enabled) return memory;
   const forgotten = forgottenCategory(text);
@@ -82,7 +86,11 @@ export function captureMemory(input, message, id = () => crypto.randomUUID(), op
   if (requested) {
     if (/^(?:my name is|my name['’]s|my names are|i(?: am|['’]m) called|(?:just )?call me|you can call me|nitwa|(?:izina ryanjye|amazina yanjye) ni|nyita|je m['’]appelle|appelle[- ]moi)\s+/i.test(requested[1])) return captureMemory(memory, requested[1], id, { explicit: true });
     const facts = extractImportantFacts(requested[1]);
-    return addMemoryNote(memory, requested[1], id, { category: facts.length === 1 ? facts[0].category : 'note' });
+    const caseNote=/\b(?:my case|my client|court case|case context|case details|urubanza|umukiriya|mon dossier|mon client)\b/i.test(requested[1]);
+    // A cut case summary can omit a crucial qualification. Ask for a shorter
+    // note rather than silently clipping it or claiming the whole note is saved.
+    if(requested[1].length>240)return memory;
+    return addMemoryNote(memory, requested[1], id, { category:caseNote?'case_context':facts.length === 1 ? facts[0].category : 'note' });
   }
   let result = memory;
   const facts = extractImportantFacts(text);
@@ -138,6 +146,7 @@ function nameComparisonQuestion(text) {
 
 function factRecallCategory(text) {
   text = text.replace(/^ese\s+/, '');
+  if(/^(?:what do you remember about my case|what(?:'s| is) my case|recall my case|ibuka urubanza rwanjye|que sais-tu de mon dossier)$/.test(text))return 'case_context';
   if (/^(?:what(?:'s| is) my (?:job|profession|occupation)|what do i do for work|do you (?:know|remember) my (?:job|profession)|uzi akazi nkora|nkora akahe kazi|quelle est ma profession)$/.test(text)) return 'occupation';
   if (/^(?:what (?:am i studying|do i study)|do you (?:know|remember) what i study|niga iki|que(?:lle mati[eè]re)? (?:j'[eé]tudie|est.ce que j'[eé]tudie))$/.test(text)) return 'education';
   if (/^(?:what project am i working on|what am i (?:building|developing)|what(?:'s| is) my project|umushinga wanjye ni uwuhe|quel est mon projet)$/.test(text)) return 'project';
@@ -224,6 +233,9 @@ function browserMemoryReply(message, input, profileName, persistent = true, hist
   const nameQuestion = nameRecallRequest(message, history);
   const control = memoryControl(message);
   if (control) {
+    if(control.field==='shareWithAI')return {language,kind:'control',reply:control.value
+      ? {en:'Saved details can now be sent to the AI service to help with your replies. You can review or stop sharing them in Memory.',rw:'Amakuru wabikishije ashobora koherezwa muri serivisi ya AI kugira ngo igufashe gusubiza. Ushobora kuyasuzuma cyangwa guhagarika kuyakoresha muri Memory.',fr:'Les détails enregistrés peuvent maintenant être envoyés au service d’IA pour vos réponses. Vous pouvez les consulter ou arrêter leur utilisation dans Mémoire.'}[language]
+      : {en:'Saved details will no longer be sent with new AI requests. Your saved notes are kept.',rw:'Amakuru wabikishije ntazongera koherezwa mu bibazo bishya bya AI. Ibyabitswe biracyahari.',fr:'Les détails enregistrés ne seront plus envoyés avec les nouvelles demandes à l’IA. Vos notes sont conservées.'}[language]};
     const on = control.value;
     const automatic = control.field === 'autoSave';
     const reply = language === 'rw' ? (on ? 'Memory irafunguye.' : 'Memory irazimye; amakuru yari abitswe ntayasibwe.')
@@ -297,7 +309,8 @@ function browserMemoryReply(message, input, profileName, persistent = true, hist
     return { language, reply: { rw: 'Nabisibye muri memory. Ibiganiro byabanje ntibyasibwe.', fr: 'C’est supprimé de la mémoire. Les anciens chats ne sont pas effacés.', en: 'Removed from saved memory. Existing chat messages haven’t been deleted.' }[language] };
   }
   if (/^(?:please\s+)?(?:remember\b|ibuka\b|ujye wibuka\b|souviens-toi\b)/.test(text)) {
-    const requested = message.trim().replace(/^(?:please\s+)?(?:remember (?:that\s+)?|ibuka (?:ko\s+)?|ujye wibuka (?:ko\s+)?|souviens-toi (?:que\s+)?)/i, '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 240);
+    const requested = message.trim().replace(/^(?:please\s+)?(?:remember (?:that\s+)?|ibuka (?:ko\s+)?|ujye wibuka (?:ko\s+)?|souviens-toi (?:que\s+)?)/i, '').replace(/[\u0000-\u001f]/g, ' ').trim();
+    if(requested.length>240)return {language,reply:{en:'That note wasn’t saved. Please shorten it to 240 characters without leaving out important case conditions.',rw:'Ibyo ntibyabitswe. Bigabanye ntibirenge inyuguti 240, utibagiwe amakuru y’ingenzi y’urubanza.',fr:'Cette note n’a pas été enregistrée. Limitez-la à 240 caractères sans omettre de condition importante du dossier.'}[language]};
     const saved = memory.enabled && (memory.items.some(item => item.kind === 'note' && item.value === requested)
       || memory.items.some(item => item.kind === 'name' && captureMemory(null, requested).items.some(saved => saved.kind === 'name' && saved.value === item.value)));
     return { language, reply: saved

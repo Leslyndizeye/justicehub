@@ -2,6 +2,29 @@
 
 Reviewed on 9 October 2026. This is the implemented selection policy, not a claim that a model understands every useful personal fact.
 
+## Case sharing controls added 3 November 2026
+
+Open Menu → Memory to review and delete details, save an explicit case summary,
+or reload account storage. Case context is saved only by an explicit remember
+request or a manually added case note. Different cases do not replace each
+other. Notes exceeding 240 characters are not silently clipped by the chat
+capture path. Credentials, including recognized Gemini key formats, are excluded.
+
+The separate `shareWithAI` permission defaults to false, including on older
+documents. When enabled, up to 2,000 JSON characters of recent whole notes can
+be included with the signed-in user's chat request; case notes take priority.
+This permission covers the primary AI connection and its configured backup.
+Disabling sharing or memory excludes notes from new requests. Clearing all
+details also revokes sharing. Previously sent requests and old chat messages
+are not deleted by these controls.
+
+The answer prompt treats memory as unverified user reports, not instructions,
+statutory authority or a court finding. New facts override saved ones. A single
+saved case can anchor a new-chat follow-up; multiple cases require a choice.
+Personalised explanations are not stored in the cross-user explanation cache.
+Private account storage still requires the `user_memories` migration. A browser
+save or healthy backend does not establish cross-device persistence.
+
 ## Research and decisions
 
 [LangChain's memory guide](https://docs.langchain.com/oss/javascript/concepts/memory) distinguishes conversation history from a user profile shared across conversations. Its discussion of profiles and collections highlights the risks of stale facts, unnecessary insertions, and updates that lose information. JusticeHub keeps a small account document separate from chat messages and checks revisions before database writes.

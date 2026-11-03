@@ -17,6 +17,7 @@ import { configuredSpeechProvider } from './speechProvider.js';
 import { speechRouter } from './speechRoutes.js';
 import { createAccountAccessStore } from './accountAccessStore.js';
 import { chatStatusLabel } from '../shared/chatPresentation.js';
+import {readMemoryContext} from '../shared/memoryContext.js';
 
 const app = express();
 const allowedOrigins = configuredCorsOrigins(process.env.FRONTEND_URL);
@@ -266,6 +267,9 @@ app.post('/api/chat', async (req, res) => {
   if (typeof uid !== 'string' || !uid.trim() || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ error: 'uid and a nonempty message are required' });
   }
+  let memoryContext;
+  try { memoryContext=readMemoryContext(req.body.memoryContext); }
+  catch { return res.status(400).json({error:'Invalid shared-memory context.',code:'invalid_memory_context'}); }
 
   const generation = new AbortController();
   let complete = false;
@@ -328,7 +332,7 @@ app.post('/api/chat', async (req, res) => {
 
     // Understand indirect wording and context before selecting any sources.
     chatStage = 'understand_question';
-    const routing = await chatProvider.understand({ message, history, signal: generation.signal });
+    const routing = await chatProvider.understand({ message, history, memoryContext, signal: generation.signal });
     // Build conversational instructions and grounded reference context.
     chatStage = 'legal_retrieval';
     const legalDocs = await searchLegalDocs(supabase, message, history, replyLanguage, { resolvedRoute: routing });
@@ -346,7 +350,7 @@ app.post('/api/chat', async (req, res) => {
     }
     chatStage = 'generate';
     const aiText = await chatProvider.reply({
-      message, role, history, legalDocs, routing, replyLanguage, streaming, signal: generation.signal,
+      message, role, history, legalDocs, routing, memoryContext, replyLanguage, streaming, signal: generation.signal,
       onEvent: (event, data) => {
         if (event === 'token') streamedReply += data.text;
         if (streaming) sendEvent(event, event === 'status'
