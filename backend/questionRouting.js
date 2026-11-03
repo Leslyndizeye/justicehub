@@ -80,7 +80,7 @@ export function questionRoute(message,history=[]) {
   const followup=legalFollowup(message);
   if(followup) {
     const at=history.findLastIndex(turn=>turn.sender==='user'&&typeof turn.content==='string'
-      && !/^(?:thanks|thank you|ok|okay|murakoze|merci)[.!?\s]*$/i.test(turn.content));
+      && !interpretCasualMessage(turn.content)?.standalone);
     if(at<0)return {kind:'unclear',answerTask:followup.answerTask};
     const previous=history[at];const earlier=questionRoute(previous.content,history.slice(0,at));
     if(!['legal','discussion'].includes(earlier.kind))return {kind:earlier.kind==='unrelated'&&followup.forceWeb?'unrelated':'unclear',answerTask:followup.answerTask};

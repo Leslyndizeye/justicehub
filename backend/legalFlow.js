@@ -1,5 +1,6 @@
 import {isPenaltyFollowup} from './legalQuestion.js';
 import {legalFields} from './legalTopics.js';
+import {explanationFollowup} from '../shared/explanationFollowup.js';
 
 export const answerTasks=Object.freeze(['none','discussion','explanation','rule','penalty','deadline','amount','procedure','eligibility','remedy','comparison','application','source','current_verification']);
 const fold=value=>String(value||'').normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[’]/g,"'").trim().replace(/[?!.,]+$/,'').replace(/\s+/g,' ');
@@ -17,6 +18,7 @@ const followups=[
 ];
 export function legalFollowup(message) {
   const text=fold(message);
+  if(explanationFollowup(message))return {answerTask:'explanation'};
   if(isPenaltyFollowup(text))return {answerTask:'penalty'};
   const found=followups.find(([,pattern])=>pattern.test(text));
   return found?{answerTask:found[0],...(found[0]==='current_verification'?{forceWeb:true}:{})}:null;
